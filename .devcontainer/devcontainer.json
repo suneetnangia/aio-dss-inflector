@@ -3,27 +3,34 @@
 	"name": "Http Mqtt Connector",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/devcontainers/base:jammy",
-
-    "features": {
+	"features": {
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {
-            "moby": false
-        },
-        "ghcr.io/devcontainers/features/dotnet:2": {
-            "version": "8.0"
-        }
+			"moby": false
+		},
+		"ghcr.io/devcontainers/features/dotnet:2": {
+			"version": "8.0"
+		},
+		"ghcr.io/audacioustux/devcontainers/k9s": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/azure-cli:1": {
+			"extensions": "connectedk8s,k8s-extension,azure-iot-ops"
+		},
+		"ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+			"version": "latest",
+			"helm": "latest",
+			"minikube": "none"
+		}
 	},
-
 	// Use this environment variable if you need to bind mount your local source code into a new container.
 	"remoteEnv": {
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
 	},
-
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "docker --version",
-
 	// Configure tool-specific properties.
 	"customizations": {
-        "vscode": {
+		"vscode": {
 			"extensions": [
 				"davidanson.vscode-markdownlint",
 				"streetsidesoftware.code-spell-checker",
@@ -33,5 +40,5 @@
 				"redhat.vscode-yaml"
 			]
 		}
-    }
+	}
 }

@@ -12,6 +12,7 @@ packages/
 *.user
 *.sln.docstates
 settings.json
+appsettings.Production.json
 
 # Ignore ReSharper files
 _ReSharper*/

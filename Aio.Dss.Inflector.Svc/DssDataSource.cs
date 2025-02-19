@@ -49,7 +49,15 @@ public class DssDataSource : IDataSource
                     backoff_delay_in_milliseconds = _initialBackoffDelayInMilliseconds;
                     successfulRead = true;
 
-                    return JsonDocument.Parse(dssResponse.Value?.Bytes);
+                    if (dssResponse.Value == null)
+                    {
+                        _logger.LogWarning($"No data found in DSS for key: '{key}'.");
+                        return JsonDocument.Parse("{}");
+                    }
+                    else
+                    {
+                        return JsonDocument.Parse(dssResponse.Value?.Bytes);
+                    }
                 }
             }
             catch (MqttCommunicationException ex)
@@ -66,6 +74,6 @@ public class DssDataSource : IDataSource
             }
         }
 
-        return null;      
+        throw new InvalidOperationException("Failed to read data from DSS store after multiple retries.");      
     }
 }

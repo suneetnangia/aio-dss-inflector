@@ -14,16 +14,25 @@ public sealed class Worker : BackgroundService
     private readonly IDataSink _dssDataSink;
     private readonly IDataSink _mqttDataSink;
     private readonly BlockingCollection<IngressHybridMessage> _ingressHybridMessages;
+    private readonly IInflectorActionLogic _logicCycleTimeAverage;
+    private readonly IInflectorActionLogic _logicShiftCounter;
 
-    public Worker(ILogger<Worker> logger, TelemetryReceiver<IngressHybridMessage> telemetryReceiver, Dictionary<string, IDataSource> dataSources, Dictionary<string, IDataSink> dataSinks)
+    public Worker(ILogger<Worker> logger,
+        TelemetryReceiver<IngressHybridMessage> telemetryReceiver,
+        Dictionary<string, IDataSource> dataSources,
+        Dictionary<string, IDataSink> dataSinks,
+        Dictionary<string, IInflectorActionLogic> inflectorActionLogics)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         dataSinks = dataSinks ?? throw new ArgumentNullException(nameof(dataSinks));
+        inflectorActionLogics = inflectorActionLogics ?? throw new ArgumentNullException(nameof(inflectorActionLogics));
 
         // Note: Do more checks for null here.
         _dssDataSource = dataSources["DssDataSource"];
         _dssDataSink = dataSinks["DssDataSink"];
         _mqttDataSink = dataSinks["MqttDataSink"];
+        _logicCycleTimeAverage = inflectorActionLogics["CycleTimeAverage"];
+        _logicShiftCounter = inflectorActionLogics["ShiftCounter"];
 
         _telemetryReceiver = telemetryReceiver ?? throw new ArgumentNullException(nameof(telemetryReceiver));
         _ingressHybridMessages = new BlockingCollection<IngressHybridMessage>();
@@ -55,42 +64,24 @@ public sealed class Worker : BackgroundService
             var ingressHybridMessage = _ingressHybridMessages.Take(cancellationToken);
             EgressHybridMessage egressHybridMessage;
 
-            _logger.LogInformation("'{action}' action received with data '{actiondatapayload}' for DSS.", ingressHybridMessage.Action, ingressHybridMessage.ActionRequestDataPayload);
-
+            _logger.LogInformation("'{action}' action received with data '{actiondatapayload}' for DSS.", ingressHybridMessage.Action, ingressHybridMessage.ActionRequestDataPayload.RootElement.ToString());
+            
             try
             {
-                if (ingressHybridMessage.Action == InflectorAction.CycleTimeAverage)
+                var actionLogicMap = new Dictionary<InflectorAction, (IInflectorActionLogic Logic, string topic)>
                 {
-                    _logger.LogTrace("Processing Cycle Time Average...");
-                    
-                    // Add Logic for Average of last 10 cycle times, this is demo code. Replace with actual logic.
-                    await _dssDataSink.PushDataAsync("123", ingressHybridMessage.ActionRequestDataPayload, cancellationToken);
-                    var dssData = await _dssDataSource.ReadDataAsync("123", cancellationToken);
+                    // Destination topic should be coming from configuration
+                    { InflectorAction.CycleTimeAverage, (_logicCycleTimeAverage, "aio-dss-inflector/data/cycletimeavg") },
+                    { InflectorAction.ShiftCounter, (_logicShiftCounter, "aio-dss-inflector/data/shiftcounter") }
+                };
 
-                    egressHybridMessage = new EgressHybridMessage
-                    {
-                        CorrelationId = ingressHybridMessage.CorrelationId,
-                        ActionResponseDataPayload = dssData,
-                        PassthroughPayload = ingressHybridMessage.PassthroughPayload
-                    };
-
-                    // Publish the data to the MQTT data sink for further processing outside of Inflector.                
-                    await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/cycletimeavg", JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
-                }
-                else if (ingressHybridMessage.Action == InflectorAction.ShiftCounter)
+                if (actionLogicMap.TryGetValue(ingressHybridMessage.Action, out var logicTopicPair))
                 {
-                    _logger.LogTrace("Processing Shift Counter...");
+                    _logger.LogTrace($"Processing {ingressHybridMessage.Action}...");
+                    egressHybridMessage = await logicTopicPair.Logic.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
 
-                    // Add Logic for Shift Counter
-                    egressHybridMessage = new EgressHybridMessage
-                    {
-                        CorrelationId = ingressHybridMessage.CorrelationId,
-                        ActionResponseDataPayload = ingressHybridMessage.ActionRequestDataPayload,
-                        PassthroughPayload = ingressHybridMessage.PassthroughPayload
-                    };
-
-                    // Publish the data to the MQTT data sink for further processing outside of Inflector.                
-                    await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/shiftcounter", JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
+                    // Publish the data to the MQTT data sink for further processing outside of Inflector.
+                    await _mqttDataSink.PushDataAsync(logicTopicPair.topic, JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
                 }
                 else
                 {
@@ -98,7 +89,6 @@ public sealed class Worker : BackgroundService
 
                     // Return the data to the MQTT data sink for further processing outside of Inflector.
                     await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/egress", JsonDocument.Parse(JsonSerializer.Serialize(ingressHybridMessage)), cancellationToken);
-                    continue;
                 }
             }
             catch (Exception ex)

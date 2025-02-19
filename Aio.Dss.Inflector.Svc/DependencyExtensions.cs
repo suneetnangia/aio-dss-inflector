@@ -79,6 +79,15 @@ public static class DependencyExtensions
             };
         });
 
+        services.AddSingleton<Dictionary<string, IInflectorActionLogic>>(provider =>
+        {
+            return new Dictionary<string, IInflectorActionLogic>
+            {
+                { "CycleTimeAverage", new ShiftCycleAverageLogic(provider.GetRequiredService<ILogger<ShiftCycleAverageLogic>>()) },
+                { "ShiftCounter", new TotalCounterLogic(provider.GetRequiredService<ILogger<TotalCounterLogic>>()) }
+            };
+        });
+
         return services;
     }
 }
