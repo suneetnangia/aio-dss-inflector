@@ -1,0 +1,13 @@
+{
+   "action": 1,
+   "actionRequestDataPayload": {
+      "CycleTime": {
+         "SourceTimestamp": "2025-02-19T14:34:38.3250966Z",
+         "Value": 28
+      }
+   },
+   "correlationId": "e8e1d420-a070-4673-89a6-c23744388ee4",
+   "passthroughPayload": {
+      "Empty": 0
+   }
+}

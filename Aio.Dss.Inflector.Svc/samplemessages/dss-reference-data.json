@@ -1,0 +1,4 @@
+{ "Id": "guid", "Name": "Shift 1", "EquipmentId": "Test", "AreaId": "areaid", "SiteId": "siteid", "FromDayOfWeek": 1, "FromTimeSite": "06:00:00", "ToTimeSite": "14:00:00" }
+{ "Id": "guid", "Name": "Shift 2", "EquipmentId": "Test", "AreaId": "areaid", "SiteId": "siteid", "FromDayOfWeek": 1, "FromTimeSite": "14:00:00", "ToTimeSite": "22:00:00" }
+{ "Id": "guid", "Name": "Shift 3", "EquipmentId": "Test", "AreaId": "areaid", "SiteId": "siteid", "FromDayOfWeek": 2, "FromTimeSite": "06:00:00", "ToTimeSite": "14:00:00" }
+{ "Id": "guid", "Name": "Shift ...", "EquipmentId": "Test", "AreaId": "areaid", "SiteId": "siteid", "FromDayOfWeek": 2, "FromTimeSite": "14:00:00", "ToTimeSite": "22:00:00" }

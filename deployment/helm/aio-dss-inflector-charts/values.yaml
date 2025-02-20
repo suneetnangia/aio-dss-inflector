@@ -1,0 +1,4 @@
+# AIO DSS Inflector module settings
+containerImage: ""
+appsettingsContent: ""
+containerPullSecret: null

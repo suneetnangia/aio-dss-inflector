@@ -1,6 +1,7 @@
 namespace Aio.Dss.Inflector.Svc;
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Iot.Operations.Mqtt.Session;
 using Azure.Iot.Operations.Services.StateStore;
 using MQTTnet.Exceptions;
@@ -27,6 +28,7 @@ public class DssDataSource : IDataSource
         _maxRetires = maxRetires;
     }
 
+    // TODO - To discuss if we want to change the signature of the interface to return string/bytes instead of JsonDocument
     public async Task<JsonDocument> ReadDataAsync(string key, CancellationToken stoppingToken)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -56,7 +58,37 @@ public class DssDataSource : IDataSource
                     }
                     else
                     {
-                        return JsonDocument.Parse(dssResponse.Value?.Bytes);
+                        // return JsonDocument.Parse(dssResponse.Value?.Bytes);
+                        // also support JSON Lines - TODO discuss if we want the source to know about the format and content type
+                        // we could generalize and leave decoding to the caller  
+                        var data = dssResponse.Value?.Bytes;
+                        if (data != null)
+                        {
+                            var dataString = System.Text.Encoding.UTF8.GetString(data);
+                            if (dataString.Contains("\n"))
+                            {
+                                // Handle JSON Lines
+                                var jsonArray = new JsonArray();
+                                foreach (var line in dataString.Split('\n'))
+                                {
+                                    if (!string.IsNullOrWhiteSpace(line))
+                                    {
+                                        jsonArray.Add(JsonDocument.Parse(line).RootElement.Clone());
+                                    }
+                                }
+                                return JsonDocument.Parse(jsonArray.ToString());
+                            }
+                            else
+                            {
+                                // Handle single JSON document
+                                return JsonDocument.Parse(data);
+                            }
+                        }
+                        else
+                        {
+                            // Evaluate if we want to throw an exception or return an empty document, key not found is not an error, could be first use
+                            return JsonDocument.Parse("{}");
+                        }
                     }
                 }
             }

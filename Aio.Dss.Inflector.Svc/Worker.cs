@@ -52,7 +52,7 @@ public sealed class Worker : BackgroundService
 
     public Task ReceiveIngressHybridMessage(string senderId, IngressHybridMessage ingressHybridMessage, IncomingTelemetryMetadata metadata)
     {
-        _logger.LogInformation("Received telemetry from {senderId}: {hybridMessage}", senderId, ingressHybridMessage);
+        _logger.LogTrace("Received telemetry from {senderId}: {hybridMessage}", senderId, ingressHybridMessage);
         _ingressHybridMessages.Add(ingressHybridMessage);
         return Task.CompletedTask;
     }
@@ -64,35 +64,32 @@ public sealed class Worker : BackgroundService
             var ingressHybridMessage = _ingressHybridMessages.Take(cancellationToken);
             EgressHybridMessage egressHybridMessage;
 
-            _logger.LogInformation("'{action}' action received with data '{actiondatapayload}' for DSS.", ingressHybridMessage.Action, ingressHybridMessage.ActionRequestDataPayload.RootElement.ToString());
+            _logger.LogTrace("'{action}' action received with data '{actiondatapayload}' for DSS.", ingressHybridMessage.Action, ingressHybridMessage.ActionRequestDataPayload.RootElement.ToString());
             
             try
             {
-                var actionLogicMap = new Dictionary<InflectorAction, (IInflectorActionLogic Logic, string topic)>
+                switch (ingressHybridMessage.Action)
                 {
-                    // Destination topic should be coming from configuration
-                    { InflectorAction.CycleTimeAverage, (_logicCycleTimeAverage, "aio-dss-inflector/data/cycletimeavg") },
-                    { InflectorAction.ShiftCounter, (_logicShiftCounter, "aio-dss-inflector/data/shiftcounter") }
-                };
-
-                if (actionLogicMap.TryGetValue(ingressHybridMessage.Action, out var logicTopicPair))
-                {
-                    _logger.LogTrace($"Processing {ingressHybridMessage.Action}...");
-                    egressHybridMessage = await logicTopicPair.Logic.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
-
-                    // Publish the data to the MQTT data sink for further processing outside of Inflector.
-                    await _mqttDataSink.PushDataAsync(logicTopicPair.topic, JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
+                    case InflectorAction.CycleTimeAverage:
+                        egressHybridMessage = await _logicCycleTimeAverage.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
+                        break;
+                    case InflectorAction.ShiftCounter:
+                        egressHybridMessage = await _logicShiftCounter.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
+                        break;
+                    default:
+                         _logger.LogWarning("Unknown action '{action}' received for DSS.", ingressHybridMessage.Action);
+                        // Return the data to the MQTT data sink for further processing outside of Inflector.
+                        await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/egress", JsonDocument.Parse(JsonSerializer.Serialize(ingressHybridMessage)), cancellationToken);
+                        continue;
                 }
-                else
-                {
-                    _logger.LogWarning("Unknown action '{action}' received for DSS.", ingressHybridMessage.Action);
 
-                    // Return the data to the MQTT data sink for further processing outside of Inflector.
-                    await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/egress", JsonDocument.Parse(JsonSerializer.Serialize(ingressHybridMessage)), cancellationToken);
-                }
+                // Publish the data to the MQTT data sink for further processing outside of Inflector.
+                _logger.LogTrace($"Publishing {ingressHybridMessage.Action} to MQTT data sink topic...");
+                await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/egress", JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
             }
             catch (Exception ex)
             {
+                // TODO evaluate also returning the ingress message in case of failure
                 _logger.LogError(ex, "Error processing data for DSS.");
             }
         }

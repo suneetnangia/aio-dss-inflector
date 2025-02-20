@@ -30,6 +30,7 @@ public class MqttDataSink : IDataSink
 
     public async Task PushDataAsync(string key, JsonDocument data, CancellationToken stoppingToken)
     {
+        // Evaluate having the key be the destination topic, allow for multiple topics. Currently key is not used.
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(data);
 
