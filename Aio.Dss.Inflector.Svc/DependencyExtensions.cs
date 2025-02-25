@@ -1,5 +1,6 @@
 namespace Aio.Dss.Inflector.Svc;
 
+using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Protocol.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,20 +39,25 @@ public static class DependencyExtensions
                 mqtt_options.Value.PasswordFilePath);
         });
 
+        services.AddSingleton<ApplicationContext>();
+
         services.AddSingleton<TelemetryReceiver<IngressHybridMessage>>(provider =>
         {
             var mqtt_options = provider.GetRequiredService<IOptions<MqttOptions>>();
+            var applicationContext = provider.GetRequiredService<ApplicationContext>();
             var sessionClient = provider.GetRequiredService<SessionClientFactory>().GetSessionClient(mqtt_options.Value.Logging, $"AioDssInflectorMQTTRead{mqtt_options.Value.ClientId}").GetAwaiter().GetResult();
-            return new HybridMessageReceiver(sessionClient);
+            return new HybridMessageReceiver(applicationContext, sessionClient);
         });
 
         services.AddSingleton<Dictionary<string, IDataSource>>(provider =>
         {
             var mqtt_options = provider.GetRequiredService<IOptions<MqttOptions>>();
             var dssSessionClient = provider.GetRequiredService<SessionClientFactory>().GetSessionClient(mqtt_options.Value.Logging, $"AioDssInflectorDSSRead{mqtt_options.Value.ClientId}").GetAwaiter().GetResult();
+            var applicationContext = provider.GetRequiredService<ApplicationContext>();
             var dssDataSink = new DssDataSource(
                 provider.GetRequiredService<ILogger<DssDataSource>>(),
-                dssSessionClient);
+                dssSessionClient,
+                applicationContext);
 
             return new Dictionary<string, IDataSource>
             {
@@ -63,14 +69,17 @@ public static class DependencyExtensions
         {
             var mqtt_options = provider.GetRequiredService<IOptions<MqttOptions>>();
             var dssSessionClient = provider.GetRequiredService<SessionClientFactory>().GetSessionClient(mqtt_options.Value.Logging, $"AioDssInflectorDSSWrite{mqtt_options.Value.ClientId}").GetAwaiter().GetResult();
+            var applicationContext = provider.GetRequiredService<ApplicationContext>();
             var dssDataSink = new DssDataSink(
                 provider.GetRequiredService<ILogger<DssDataSink>>(),
-                dssSessionClient);
+                dssSessionClient,
+                applicationContext);
 
             var mqttSessionClient = provider.GetRequiredService<SessionClientFactory>().GetSessionClient(mqtt_options.Value.Logging, $"AioDssInflectorMQTTWrite{mqtt_options.Value.ClientId}").GetAwaiter().GetResult();
             var mqttDataSink = new MqttDataSink(
                 provider.GetRequiredService<ILogger<MqttDataSink>>(),
-                mqttSessionClient, "aio-dss-inflector/data/egress");
+                mqttSessionClient, 
+                "aio-dss-inflector/data/egress");
 
             return new Dictionary<string, IDataSink>
             {
@@ -81,6 +90,8 @@ public static class DependencyExtensions
 
         services.AddSingleton<Dictionary<string, IInflectorActionLogic>>(provider =>
         {
+            // Note: this could be refactored to inject only one of the logics based on configuration, so the logic is dedicated to one action per deployment
+            // Keeping it simple to processing two actions within same project and single deployment for now
             return new Dictionary<string, IInflectorActionLogic>
             {
                 { "CycleTimeAverage", new CycleTimeAverageLogic(provider.GetRequiredService<ILogger<CycleTimeAverageLogic>>()) },

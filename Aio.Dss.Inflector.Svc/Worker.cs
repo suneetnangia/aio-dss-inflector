@@ -54,6 +54,8 @@ public sealed class Worker : BackgroundService
     {
         _logger.LogTrace("Received telemetry from {senderId}: {hybridMessage}", senderId, ingressHybridMessage);
         _ingressHybridMessages.Add(ingressHybridMessage);
+        // For POC: message acknowledged by default once it's added to the collection. 
+        // If fatal crash beyond this point, other than retry logic, message will not be resent by MQTT broker.
         return Task.CompletedTask;
     }
 

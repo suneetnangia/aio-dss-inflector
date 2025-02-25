@@ -1,5 +1,6 @@
 namespace Aio.Dss.Inflector.Svc;
 
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -21,12 +22,30 @@ public class Utf8JsonSerializer : IPayloadSerializer
     public const MqttPayloadFormatIndicator PayloadFormatIndicator = MqttPayloadFormatIndicator.CharacterData;
 
 
-    SerializedPayloadContext IPayloadSerializer.ToBytes<T>(T? payload) where T : class
+    // SerializedPayloadContext IPayloadSerializer.ToBytes<T>(T? payload) where T : class
+    // {
+    //     try
+    //     {
+    //         var serializedBytes = JsonSerializer.SerializeToUtf8Bytes(payload, jsonSerializerOptions);
+    //         return new SerializedPayloadContext(serializedBytes, ContentType, PayloadFormatIndicator);
+    //     }
+    //     catch (Exception)
+    //     {
+    //         throw AkriMqttException.GetPayloadInvalidException();
+    //     }
+    // }
+
+    public SerializedPayloadContext ToBytes<T>(T? payload)
+        where T : class
     {
         try
         {
-            var serializedBytes = JsonSerializer.SerializeToUtf8Bytes(payload, jsonSerializerOptions);
-            return new SerializedPayloadContext(serializedBytes, ContentType, PayloadFormatIndicator);
+            if (typeof(T) == typeof(EmptyJson))
+            {
+                return new(ReadOnlySequence<byte>.Empty, ContentType, PayloadFormatIndicator);
+            }
+
+            return new(new(JsonSerializer.SerializeToUtf8Bytes(payload, jsonSerializerOptions)), ContentType, PayloadFormatIndicator);
         }
         catch (Exception)
         {
@@ -34,23 +53,40 @@ public class Utf8JsonSerializer : IPayloadSerializer
         }
     }
 
-    public T FromBytes<T>(byte[]? payload, string? contentType, MqttPayloadFormatIndicator payloadFormatIndicator) where T : class
+    public T FromBytes<T>(ReadOnlySequence<byte> payload, string? contentType, MqttPayloadFormatIndicator payloadFormatIndicator)
+        where T : class
     {
-        if (payload == null || payload.Length == 0)
+        if (contentType != null && contentType != ContentType)
         {
-            if (typeof(T) != typeof(EmptyJson))
+            throw new AkriMqttException($"Content type {contentType} is not supported by this implementation; only {ContentType} is accepted.")
             {
-                throw AkriMqttException.GetPayloadInvalidException();
-            }
-
-            return (new EmptyJson() as T)!;
+                Kind = AkriMqttErrorKind.HeaderInvalid,
+                HeaderName = "Content Type",
+                HeaderValue = contentType,
+                InApplication = false,
+                IsShallow = false,
+                IsRemote = false,
+            };
         }
 
-        // Console.WriteLine($"Received payload: {Encoding.UTF8.GetString(payload)}");
-        // var str = "{ \"action\": \"SomeAction\", \"actionData\": \"SomeActionData\", \"payload\": \"SomePayload\" }";
-        Utf8JsonReader reader = new(payload);        
+        try
+        {
+            if (payload.IsEmpty)
+            {
+                if (typeof(T) != typeof(EmptyJson))
+                {
+                    throw AkriMqttException.GetPayloadInvalidException();
+                }
 
-        return JsonSerializer.Deserialize<T>(ref reader, jsonSerializerOptions)!;
-        // return default;
+                return (new EmptyJson() as T)!;
+            }
+
+            Utf8JsonReader reader = new(payload);
+            return JsonSerializer.Deserialize<T>(ref reader, jsonSerializerOptions)!;
+        }
+        catch (Exception)
+        {
+            throw AkriMqttException.GetPayloadInvalidException();
+        }
     }
 }
