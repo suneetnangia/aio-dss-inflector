@@ -4,13 +4,13 @@ using Aio.Dss.Inflector.Svc;
 public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
 {
     private readonly ILogger<CycleTimeAverageLogic> _logger;
+    private readonly string _dssKeyShiftsReference;
+    private readonly string _dssKeyLastTenShifts;
 
-    // Note: consider moving these keys to configurations passed in from the constructor
-    private readonly string _dssKeyShiftsReference = "shifts";
-    private readonly string _dssKeyLastTenShifts = "lastTenShifts";
-
-    public CycleTimeAverageLogic(ILogger<CycleTimeAverageLogic> logger)
+    public CycleTimeAverageLogic(ILogger<CycleTimeAverageLogic> logger, string dssKeyShiftsReference = "shifts", string dssKeyLastTenShifts = "lastTenShifts")
     {
+        _dssKeyShiftsReference = dssKeyShiftsReference;
+        _dssKeyLastTenShifts = dssKeyLastTenShifts;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -20,6 +20,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
         {
             List<CycleTime> lastTenShifts = new();
             ShiftReference? shiftReference = null;
+
             _logger.LogDebug("Received message: '{payload}'", message.ActionRequestDataPayload.RootElement.ToString());
 
             if (message.ActionRequestDataPayload.RootElement.TryGetProperty("CycleTime", out JsonElement cycleTimeElement))
@@ -29,7 +30,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                 {
                     throw new ArgumentNullException(nameof(cycleTime));
                 }
-                
+
                 var dssLastTenShifts = await dataSource.ReadDataAsync(_dssKeyLastTenShifts, cancellationToken);
                 if (dssLastTenShifts != null &&
                     dssLastTenShifts.RootElement.ValueKind == JsonValueKind.Array &&
@@ -60,6 +61,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                 await dataSink.PushDataAsync(_dssKeyLastTenShifts, JsonDocument.Parse(JsonSerializer.Serialize(lastTenShifts)), cancellationToken);
 
                 var referenceData = await dataSource.ReadDataAsync(_dssKeyShiftsReference, cancellationToken);
+
                 _logger.LogDebug("Reference data found in DSS for key: '{reference}': '{root}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
                 if (referenceData != null && referenceData.RootElement.ValueKind == JsonValueKind.Array)
                 {
@@ -70,16 +72,17 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                         shiftReference = GetShiftFromTime(cycleTime.SourceTimestamp, shiftData);
                         if (shiftReference == null)
                         {
-                            _logger.LogWarning("No shift data found for timestamp '{SourceTimestamp}'. Message can be discarded", cycleTime.SourceTimestamp);
-                            throw new InvalidOperationException(string.Format("No shift data found for timestamp '{0}'.", cycleTime.SourceTimestamp));
+                            throw new InvalidOperationException($"No shift data found for timestamp 'cycleTime.SourceTimestamp'.");
                         }
+                        
                         _logger.LogDebug("Shift reference data found for timestamp '{0}': '{1}'", cycleTime.SourceTimestamp, shiftReference);
 
                         // We are hardcoding the resulting message for now...
                         var responseActionPayload = new
                         {
                             action = "result",
-                            payload = new {
+                            payload = new
+                            {
                                 specVersion = "1.0",
                                 type = "StationAttribute.Value.Updated.v1",
                                 source = "poc/localuns/microsoft/avgCycleTime",
@@ -111,19 +114,16 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                     }
                     else
                     {
-                        _logger.LogWarning("No shift reference data found in DSS. Returning.");
                         throw new InvalidOperationException("No shift reference data found in DSS.");
                     }
                 }
                 else
                 {
-                    _logger.LogWarning("No shift reference data found in DSS. Returning.");
                     throw new InvalidOperationException("No shift reference data found in DSS.");
                 }
             }
             else
             {
-                _logger.LogWarning("CycleTime property not found in ActionRequestDataPayload.");
                 throw new InvalidOperationException("CycleTime property not found in ActionRequestDataPayload.");
             }
         }

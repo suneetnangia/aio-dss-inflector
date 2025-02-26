@@ -2,16 +2,7 @@ using System.Text.Json;
 
 public abstract class BaseLogic
 {
-    protected ShiftReference? GetShiftFromTime(DateTime sourceTimestamp, List<ShiftReference> shiftData)
-    {
-        TimeSpan time = sourceTimestamp.TimeOfDay;
-        int timeInt = (int)time.TotalSeconds;
-
-        var match = shiftData.FirstOrDefault(x => x.FromDayOfWeek == GetDayOfWeekInt(sourceTimestamp) && timeInt >= x.FromTimeSite.TotalSeconds && timeInt <= x.ToTimeSite.TotalSeconds);
-        return match;
-    }
-
-    protected int GetDayOfWeekInt(DateTime timestamp)
+    private int GetDayOfWeekInt(DateTime timestamp)
     {
         return timestamp.DayOfWeek switch
         {
@@ -24,21 +15,12 @@ public abstract class BaseLogic
         };
     }
 
-    protected List<ShiftReference> ParseJsonLines(string jsonLines)
+    protected ShiftReference? GetShiftFromTime(DateTime sourceTimestamp, List<ShiftReference> shiftData)
     {
-        var shiftData = new List<ShiftReference>();
-        using (var reader = new StringReader(jsonLines))
-        {
-            string? line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                var shiftReference = JsonSerializer.Deserialize<ShiftReference>(line);
-                if (shiftReference != null)
-                {
-                    shiftData.Add(shiftReference);
-                }
-            }
-        }
-        return shiftData;
+        TimeSpan time = sourceTimestamp.TimeOfDay;
+        int timeInt = (int)time.TotalSeconds;
+
+        var match = shiftData.FirstOrDefault(x => x.FromDayOfWeek == GetDayOfWeekInt(sourceTimestamp) && timeInt >= x.FromTimeSite.TotalSeconds && timeInt <= x.ToTimeSite.TotalSeconds);
+        return match;
     }
 }
