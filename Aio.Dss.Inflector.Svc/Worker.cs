@@ -8,14 +8,14 @@ using Microsoft.Extensions.Logging;
 
 public sealed class Worker : BackgroundService
 {
+    private const string MQTT_EGRESS_TOPIC = "aio-dss-inflector/data/egress";
     private readonly ILogger<Worker> _logger;
     TelemetryReceiver<IngressHybridMessage> _telemetryReceiver;
     private readonly IDataSource _dssDataSource;
     private readonly IDataSink _dssDataSink;
     private readonly IDataSink _mqttDataSink;
     private readonly BlockingCollection<IngressHybridMessage> _ingressHybridMessages;
-    private readonly IInflectorActionLogic _logicCycleTimeAverage;
-    private readonly IInflectorActionLogic _logicShiftCounter;
+    private readonly Dictionary<string, IInflectorActionLogic> _inflectorActionLogics;    
 
     public Worker(ILogger<Worker> logger,
         TelemetryReceiver<IngressHybridMessage> telemetryReceiver,
@@ -31,8 +31,7 @@ public sealed class Worker : BackgroundService
         _dssDataSource = dataSources["DssDataSource"];
         _dssDataSink = dataSinks["DssDataSink"];
         _mqttDataSink = dataSinks["MqttDataSink"];
-        _logicCycleTimeAverage = inflectorActionLogics["CycleTimeAverage"];
-        _logicShiftCounter = inflectorActionLogics["ShiftCounter"];
+        _inflectorActionLogics = inflectorActionLogics;        
 
         _telemetryReceiver = telemetryReceiver ?? throw new ArgumentNullException(nameof(telemetryReceiver));
         _ingressHybridMessages = new BlockingCollection<IngressHybridMessage>();
@@ -40,7 +39,7 @@ public sealed class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Initiating the inflector: {time}", DateTimeOffset.Now);
+        _logger.LogInformation("Initiating the inflector: {time}", DateTimeOffset.UtcNow);
 
         // Start the message receiver
         _telemetryReceiver.OnTelemetryReceived = ReceiveIngressHybridMessage;
@@ -70,24 +69,20 @@ public sealed class Worker : BackgroundService
             
             try
             {
-                switch (ingressHybridMessage.Action)
+                if (!_inflectorActionLogics.TryGetValue(ingressHybridMessage.Action.ToString(), out var actionLogic))
                 {
-                    case InflectorAction.CycleTimeAverage:
-                        egressHybridMessage = await _logicCycleTimeAverage.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
-                        break;
-                    case InflectorAction.ShiftCounter:
-                        egressHybridMessage = await _logicShiftCounter.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
-                        break;
-                    default:
-                         _logger.LogWarning("Unknown action '{action}' received for DSS.", ingressHybridMessage.Action);
-                        // Return the data to the MQTT data sink for further processing outside of Inflector.
-                        await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/egress", JsonDocument.Parse(JsonSerializer.Serialize(ingressHybridMessage)), cancellationToken);
-                        continue;
+                    _logger.LogWarning("Unknown action '{action}' received for DSS, returning the message received.", ingressHybridMessage.Action);
+
+                    // Return the data to the MQTT data sink for further processing outside of Inflector.
+                    await _mqttDataSink.PushDataAsync(MQTT_EGRESS_TOPIC, JsonDocument.Parse(JsonSerializer.Serialize(ingressHybridMessage)), cancellationToken);
+                    continue;
                 }
+
+                egressHybridMessage = await actionLogic.Execute(ingressHybridMessage, _dssDataSource, _dssDataSink, cancellationToken);
 
                 // Publish the data to the MQTT data sink for further processing outside of Inflector.
                 _logger.LogTrace($"Publishing {ingressHybridMessage.Action} to MQTT data sink topic...");
-                await _mqttDataSink.PushDataAsync("aio-dss-inflector/data/egress", JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
+                await _mqttDataSink.PushDataAsync(MQTT_EGRESS_TOPIC, JsonDocument.Parse(JsonSerializer.Serialize(egressHybridMessage)), cancellationToken);
             }
             catch (Exception ex)
             {

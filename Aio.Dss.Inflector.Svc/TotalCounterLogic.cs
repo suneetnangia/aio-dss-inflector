@@ -4,13 +4,16 @@ using Aio.Dss.Inflector.Svc;
 public class TotalCounterLogic : BaseLogic, IInflectorActionLogic
 {
     private readonly ILogger<TotalCounterLogic> _logger;
-    private readonly string _dssKeyShiftsReference = "shifts";
-    private readonly string _dssKeyLkvShiftCounter = "lkvShiftCounter";
-    private readonly string _dssKeyPreviousShiftCounter = "previousShiftCounter";
+    private readonly string _dssKeyShiftsReference;
+    private readonly string _dssKeyLkvShiftCounter;
+    private readonly string _dssKeyPreviousShiftCounter;
 
-    public TotalCounterLogic(ILogger<TotalCounterLogic> logger)
+    public TotalCounterLogic(ILogger<TotalCounterLogic> logger, string dssKeyShiftsReference = "shifts", string dssKeyLkvShiftCounter = "lkvShiftCounter", string dssKeyPreviousShiftCounter = "previousShiftCounter")
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dssKeyShiftsReference = dssKeyShiftsReference;
+        _dssKeyLkvShiftCounter = dssKeyLkvShiftCounter;
+        _dssKeyPreviousShiftCounter = dssKeyPreviousShiftCounter;
     }
 
     public async Task<EgressHybridMessage> Execute(IngressHybridMessage message, IDataSource dataSource, IDataSink dataSink, CancellationToken cancellationToken)
@@ -28,21 +31,21 @@ public class TotalCounterLogic : BaseLogic, IInflectorActionLogic
                 }
 
                 var referenceData = await dataSource.ReadDataAsync(_dssKeyShiftsReference, cancellationToken);
+                
                 _logger.LogTrace("Reference data found in DSS for key: '{key}': '{root}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
+                
                 if (referenceData != null && referenceData.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     var shiftData = JsonSerializer.Deserialize<List<ShiftReference>>(referenceData.RootElement.ToString());
 
                     if (shiftData == null || !shiftData.Any())
                     {
-                        _logger.LogWarning("No shift reference data found in DSS for key: '{reference}'.", _dssKeyShiftsReference);
                         throw new InvalidOperationException(string.Format("No shift reference data found in DSS for key: '{0}'.", _dssKeyShiftsReference));
                     }
 
                     var shiftReference = GetShiftFromTime(totalCounter.SourceTimestamp, shiftData);
                     if (shiftReference == null)
                     {
-                        _logger.LogWarning("No shift data found for timestamp '{totalCounter.SourceTimestamp}'. Message can be discarded", totalCounter.SourceTimestamp);
                         throw new InvalidOperationException(string.Format("No shift data found for timestamp '{timestamp}'.", totalCounter.SourceTimestamp));
                     }
 
@@ -134,13 +137,11 @@ public class TotalCounterLogic : BaseLogic, IInflectorActionLogic
                 }
                 else
                 {
-                    _logger.LogWarning("No shift reference data found in DSS. Returning.");
                     throw new InvalidOperationException("No shift reference data found in DSS.");
                 }
             }
             else
             {
-                _logger.LogWarning("TotalCounter property not found in ActionRequestDataPayload.");
                 throw new InvalidOperationException("TotalCounter property not found in ActionRequestDataPayload.");
             }
         }

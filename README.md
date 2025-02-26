@@ -1,6 +1,6 @@
 # AIO DSS Inflector
 
-The primary purpose of this service is to allow AIO's Distributed Data Store (DSS) be part of Data Flow for both read and write purposes.
+The primary purpose of this service is to allow AIO's Distributed Data Store (DSS) be part of Data Flow for both read and write purposes, by virtue of that it's addressing the current gap in AIO to perform complex and stateful message processing.
 It works on the messaging concept of pub-sub and lean towards building smaller services (nano) on top of Dataflow, as depicted below:
 
 ![AIO DSS Inflector](docs/media/aio-dss-inflector.png)
