@@ -5,9 +5,11 @@ It works on the messaging concept of pub-sub and lean towards building smaller s
 
 ![AIO DSS Inflector](docs/media/aio-dss-inflector.png)
 
-## Deployment (to be completed with docker build/helm deploy)
+## Dev Loop
 
-Sample `appsettings.json` file:
+[Add Details]
+
+### Sample `appsettings.json` File
 
 ```json
 {
