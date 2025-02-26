@@ -5,7 +5,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
 {
     private readonly ILogger<CycleTimeAverageLogic> _logger;
 
-    // TODO - consider moving these keys to configurations passed in from the constructor
+    // Note: consider moving these keys to configurations passed in from the constructor
     private readonly string _dssKeyShiftsReference = "shifts";
     private readonly string _dssKeyLastTenShifts = "lastTenShifts";
 
@@ -20,7 +20,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
         {
             List<CycleTime> lastTenShifts = new();
             ShiftReference? shiftReference = null;
-            _logger.LogDebug("Received message: '{0}'", message.ActionRequestDataPayload.RootElement.ToString());
+            _logger.LogDebug("Received message: '{payload}'", message.ActionRequestDataPayload.RootElement.ToString());
 
             if (message.ActionRequestDataPayload.RootElement.TryGetProperty("CycleTime", out JsonElement cycleTimeElement))
             {
@@ -41,7 +41,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                 else
                 {
                     // This is the first time we are running, so expected behavior
-                    _logger.LogDebug("No data found in DSS for key: '{0}'.", _dssKeyLastTenShifts);
+                    _logger.LogDebug("No data found in DSS for key: '{key}'.", _dssKeyLastTenShifts);
                 }
 
                 if (lastTenShifts.Count >= 10)
@@ -51,7 +51,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                     _logger.LogDebug("Removed the oldest shift from the list.");
                 }
 
-                // TODO - reflect on logic to ensure the same message is not added twice to the 10 items array - QoS1 allows duplicates
+                // Note - reflect on logic to ensure the same message is not added twice to the 10 items array - QoS1 allows duplicates
                 lastTenShifts.Add(cycleTime);
 
                 // calculate average of the 10 items (or less if just starting up)
@@ -60,7 +60,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                 await dataSink.PushDataAsync(_dssKeyLastTenShifts, JsonDocument.Parse(JsonSerializer.Serialize(lastTenShifts)), cancellationToken);
 
                 var referenceData = await dataSource.ReadDataAsync(_dssKeyShiftsReference, cancellationToken);
-                _logger.LogDebug("Reference data found in DSS for key: '{0}': '{1}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
+                _logger.LogDebug("Reference data found in DSS for key: '{reference}': '{root}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
                 if (referenceData != null && referenceData.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     var shiftData = JsonSerializer.Deserialize<List<ShiftReference>>(referenceData.RootElement.ToString());
@@ -70,7 +70,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                         shiftReference = GetShiftFromTime(cycleTime.SourceTimestamp, shiftData);
                         if (shiftReference == null)
                         {
-                            _logger.LogWarning("No shift data found for timestamp '{0}'. Message can be discarded", cycleTime.SourceTimestamp);
+                            _logger.LogWarning("No shift data found for timestamp '{SourceTimestamp}'. Message can be discarded", cycleTime.SourceTimestamp);
                             throw new InvalidOperationException(string.Format("No shift data found for timestamp '{0}'.", cycleTime.SourceTimestamp));
                         }
                         _logger.LogDebug("Shift reference data found for timestamp '{0}': '{1}'", cycleTime.SourceTimestamp, shiftReference);
@@ -129,33 +129,11 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing message: '{0}'", message.ActionRequestDataPayload.RootElement.ToString());
+            _logger.LogError(ex, "Error processing message: '{message.ActionRequestDataPayload}'", message.ActionRequestDataPayload.RootElement.ToString());
             throw;
         }
 
     }
-
-    // private ShiftReference? GetShiftFromTime(DateTime sourceTimestamp, List<ShiftReference> shiftData)
-    // {
-    //     TimeSpan time = sourceTimestamp.TimeOfDay;
-    //     int timeInt = (int)time.TotalSeconds;
-
-    //     var match = shiftData.FirstOrDefault(x => x.FromDayOfWeek == GetDayOfWeekInt(sourceTimestamp) && timeInt >= x.FromTimeSite.TotalSeconds && timeInt <= x.ToTimeSite.TotalSeconds);
-    //     return match;
-    // }
-
-    // private int GetDayOfWeekInt(DateTime timestamp)
-    // {
-    //     return timestamp.DayOfWeek switch
-    //     {
-    //         DayOfWeek.Monday => 1,
-    //         DayOfWeek.Tuesday => 2,
-    //         DayOfWeek.Wednesday => 3,
-    //         DayOfWeek.Thursday => 4,
-    //         DayOfWeek.Friday => 5,
-    //         _ => 0 // Return 0 for Saturday and Sunday
-    //     };
-    // }
 
     public class CycleTime
     {

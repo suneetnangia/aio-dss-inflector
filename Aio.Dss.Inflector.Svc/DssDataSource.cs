@@ -32,7 +32,7 @@ public class DssDataSource : IDataSource
         _maxRetires = maxRetires;
     }
 
-    // TODO - To discuss if we want to change the signature of the interface to return string/bytes instead of JsonDocument
+    // Note - Evaluate if we want to change the signature of the interface to return string/bytes instead of JsonDocument
     public async Task<JsonDocument> ReadDataAsync(string key, CancellationToken stoppingToken)
     {
         ArgumentNullException.ThrowIfNull(key);

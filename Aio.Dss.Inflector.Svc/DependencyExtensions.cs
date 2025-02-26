@@ -78,8 +78,7 @@ public static class DependencyExtensions
             var mqttSessionClient = provider.GetRequiredService<SessionClientFactory>().GetSessionClient(mqtt_options.Value.Logging, $"AioDssInflectorMQTTWrite{mqtt_options.Value.ClientId}").GetAwaiter().GetResult();
             var mqttDataSink = new MqttDataSink(
                 provider.GetRequiredService<ILogger<MqttDataSink>>(),
-                mqttSessionClient, 
-                "aio-dss-inflector/data/egress");
+                mqttSessionClient);
 
             return new Dictionary<string, IDataSink>
             {

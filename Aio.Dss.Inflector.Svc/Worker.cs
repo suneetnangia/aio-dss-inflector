@@ -91,7 +91,7 @@ public sealed class Worker : BackgroundService
             }
             catch (Exception ex)
             {
-                // TODO evaluate also returning the ingress message in case of failure
+                // Note - evaluate also returning the ingress message in case of failure
                 _logger.LogError(ex, "Error processing data for DSS.");
             }
         }

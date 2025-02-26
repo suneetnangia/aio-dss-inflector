@@ -16,16 +16,16 @@ spec:
       # Otherwise create it with `kubectl create serviceaccount mqtt-client -n azure-iot-operations`
       serviceAccountName: mqtt-client
       containers:
-        - name: aio-dss-inflector
-          image: "{{ .Values.containerImage }}"
-          imagePullPolicy: Always
-          volumeMounts:
-            - name: config
-              mountPath: /app/settings
-            - name: broker-sat
-              mountPath: /var/run/secrets/tokens
-            - name: trust-bundle
-              mountPath: /var/run/certs
+      - name: aio-dss-inflector
+        image: "{{ .Values.containerImage }}"
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: config
+            mountPath: /app/settings
+          - name: broker-sat
+            mountPath: /var/run/secrets/tokens
+          - name: trust-bundle
+            mountPath: /var/run/certs
       {{- if .Values.containerPullSecret }}
       imagePullSecrets:
         - name: {{ .Values.containerPullSecret }}

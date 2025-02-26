@@ -17,7 +17,7 @@ public class TotalCounterLogic : BaseLogic, IInflectorActionLogic
     {
         try
         {
-            _logger.LogTrace("Received message: '{0}'", message.ActionRequestDataPayload.RootElement.ToString());
+            _logger.LogTrace("Received message: '{message}'", message.ActionRequestDataPayload.RootElement.ToString());
 
             if (message.ActionRequestDataPayload.RootElement.TryGetProperty("TotalCounter", out JsonElement totalCounterElement))
             {
@@ -28,21 +28,21 @@ public class TotalCounterLogic : BaseLogic, IInflectorActionLogic
                 }
 
                 var referenceData = await dataSource.ReadDataAsync(_dssKeyShiftsReference, cancellationToken);
-                _logger.LogTrace("Reference data found in DSS for key: '{0}': '{1}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
+                _logger.LogTrace("Reference data found in DSS for key: '{key}': '{root}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
                 if (referenceData != null && referenceData.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     var shiftData = JsonSerializer.Deserialize<List<ShiftReference>>(referenceData.RootElement.ToString());
 
                     if (shiftData == null || !shiftData.Any())
                     {
-                        _logger.LogWarning("No shift reference data found in DSS for key: '{0}'.", _dssKeyShiftsReference);
+                        _logger.LogWarning("No shift reference data found in DSS for key: '{reference}'.", _dssKeyShiftsReference);
                         throw new InvalidOperationException(string.Format("No shift reference data found in DSS for key: '{0}'.", _dssKeyShiftsReference));
                     }
 
                     var shiftReference = GetShiftFromTime(totalCounter.SourceTimestamp, shiftData);
                     if (shiftReference == null)
                     {
-                        _logger.LogWarning("No shift data found for timestamp '{0}'. Message can be discarded", totalCounter.SourceTimestamp);
+                        _logger.LogWarning("No shift data found for timestamp '{totalCounter.SourceTimestamp}'. Message can be discarded", totalCounter.SourceTimestamp);
                         throw new InvalidOperationException(string.Format("No shift data found for timestamp '{timestamp}'.", totalCounter.SourceTimestamp));
                     }
 
