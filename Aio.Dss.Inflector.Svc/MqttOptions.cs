@@ -20,4 +20,6 @@ public class MqttOptions
 
     public required string CaFilePath { get; set; }
 
+    public required string ClientId { get; set; }
+
 }

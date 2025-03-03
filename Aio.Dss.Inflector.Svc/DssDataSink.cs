@@ -2,6 +2,7 @@ namespace Aio.Dss.Inflector.Svc;
 
 using System.Text.Json;
 using Azure.Iot.Operations.Mqtt.Session;
+using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Services.StateStore;
 using MQTTnet.Exceptions;
 
@@ -9,17 +10,20 @@ public class DssDataSink : IDataSink
 {
     private readonly ILogger _logger;    
     private readonly MqttSessionClient _mqttSessionClient;
+    private readonly ApplicationContext _applicationContext;
     private int _initialBackoffDelayInMilliseconds;
     private int _maxBackoffDelayInMilliseconds;
 
     public DssDataSink(
         ILogger logger,        
         MqttSessionClient mqttSessionClient,
+        ApplicationContext applicationContext,
         int initialBackoffDelayInMilliseconds = 500,
         int maxBackoffDelayInMilliseconds = 10_000)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));        
         _mqttSessionClient = mqttSessionClient ?? throw new ArgumentNullException(nameof(mqttSessionClient));
+        _applicationContext = applicationContext ?? throw new ArgumentNullException(nameof(applicationContext));
         _initialBackoffDelayInMilliseconds = initialBackoffDelayInMilliseconds;
         _maxBackoffDelayInMilliseconds = maxBackoffDelayInMilliseconds;
     }
@@ -38,7 +42,7 @@ public class DssDataSink : IDataSink
         {
             try
             {
-                await using StateStoreClient stateStoreClient = new(_mqttSessionClient);
+                await using StateStoreClient stateStoreClient = new(_applicationContext, _mqttSessionClient);
                 {
                     // Push the ingress hybrid message to the state store.                    
                     await stateStoreClient.SetAsync(key, JsonSerializer.Serialize(data), null, null, stoppingToken);

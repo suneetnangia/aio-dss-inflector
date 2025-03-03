@@ -1,0 +1,13 @@
+{
+  "action": 0,
+  "actionRequestDataPayload": {
+    "TotalCounter": {
+      "SourceTimestamp": "2025-02-19T14:32:05.324709Z",
+      "Value": 20
+    }
+  },
+  "correlationId": "bcbed094-56d7-4a25-beb2-0321014361d3",
+  "passthroughPayload": {
+    "Empty": 0
+  }
+}

@@ -32,9 +32,15 @@ public class SessionClientFactory
         _logger.LogInformation("CA cert file location: '{file}'.", _caFilePath);
         _logger.LogInformation("Password file location: '{file}'.", _passwordFilePath);
 
+        // To be discussed: 
+        // QoS1 setting for subscribers with TelemetryReceiver - review
+        // CleanStart= is set to true by default - we want to set false when subscribing with QoS1 so not to lose any messages upon restart/rolling update
+
         MqttConnectionSettings connectionSettings = new(_host)
         {
             TcpPort = _port,
+            // TO discuss client Id may be simplified, should be set via config so that same code base can be used for different deployments
+            // each should have unique client, prevent breaking connection for same client ID on other deployments
             ClientId = "AIO-DSS-Inflector-" + clientIdExtension,
             UseTls = _useTls,
             Username = _username,
