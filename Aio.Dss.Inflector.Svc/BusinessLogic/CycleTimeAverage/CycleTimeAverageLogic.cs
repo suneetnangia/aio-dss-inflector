@@ -87,8 +87,6 @@ public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
                             payload = new
                             {
                                 specVersion = "1.0",
-                                type = "StationAttribute.Value.Updated.v1",
-                                source = "poc/localuns/microsoft/avgCycleTime",
                                 id = Guid.NewGuid(),
                                 time = cycleTime.SourceTimestamp,
                                 data = new
@@ -96,11 +94,7 @@ public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
                                     siteId = shiftReference.SiteId,
                                     areaId = shiftReference.AreaId,
                                     equipmentId = shiftReference.EquipmentId,
-                                    stationId = "302374d7-033d-45f9-990d-745680d96326",
-                                    stationAttributeId = "f263a248-cf54-4a9f-b54f-6101367c8775",
-                                    esmiGroupCode = 2,
-                                    esmiSubGroupCode = 3,
-                                    attributeName = "lr_avgCycleTime",
+                                    attributeName = "AvgCycleTime",
                                     attributeValue = average,
                                     attributeValueType = "double",
                                     attributeTime = DateTime.UtcNow

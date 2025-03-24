@@ -110,8 +110,6 @@ public class TotalCounterLogic : Logic, IInflectorActionLogic
                         payload = new
                         {
                             specVersion = "1.0",
-                            type = "StationAttribute.Value.Updated.v1",
-                            source = "poc/localuns/microsoft/shiftCounter",
                             id = Guid.NewGuid(),
                             time = totalCounter.SourceTimestamp,
                             data = new
@@ -119,11 +117,7 @@ public class TotalCounterLogic : Logic, IInflectorActionLogic
                                 siteId = shiftReference.SiteId,
                                 areaId = shiftReference.AreaId,
                                 equipmentId = shiftReference.EquipmentId,
-                                stationId = "302374d7-033d-45f9-990d-745680d96326",
-                                stationAttributeId = "c27063cf-f24f-425b-af0c-b8298bd6fd67",
-                                esmiGroupCode = 2,
-                                esmiSubGroupCode = 3,
-                                attributeName = "lr_ShiftCounter",
+                                attributeName = "ShiftCounter",
                                 attributeValue = shiftCounterValue,
                                 attributeValueType = "double",
                                 attributeTime = DateTime.UtcNow
