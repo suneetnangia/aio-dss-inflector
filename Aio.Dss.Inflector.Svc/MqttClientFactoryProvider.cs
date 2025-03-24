@@ -38,9 +38,7 @@ public class SessionClientFactory
 
         MqttConnectionSettings connectionSettings = new(_host)
         {
-            TcpPort = _port,
-            // TO discuss client Id may be simplified, should be set via config so that same code base can be used for different deployments
-            // each should have unique client, prevent breaking connection for same client ID on other deployments
+            TcpPort = _port,            
             ClientId = "AIO-DSS-Inflector-" + clientIdExtension,
             UseTls = _useTls,
             Username = _username,

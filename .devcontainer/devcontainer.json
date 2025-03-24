@@ -20,7 +20,10 @@
 			"version": "latest",
 			"helm": "latest",
 			"minikube": "none"
-		}
+		},
+		"ghcr.io/devcontainers-contrib/features/apt-get-packages:1": {
+            "packages": "mosquitto-clients"
+        }
 	},
 	// Use this environment variable if you need to bind mount your local source code into a new container.
 	"remoteEnv": {

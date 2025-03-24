@@ -5,24 +5,58 @@ using System.Text.Json;
 using Azure.Iot.Operations.Mqtt.Session;
 using Azure.Iot.Operations.Protocol.Models;
 using MQTTnet.Exceptions;
+using Polly;
+using Polly.Retry;
 
 public class MqttDataSink : IDataSink
 {
     private readonly ILogger _logger;    
     private readonly MqttSessionClient _mqttSessionClient;
-    private int _initialBackoffDelayInMilliseconds;
-    private int _maxBackoffDelayInMilliseconds;
+    private readonly int _initialBackoffDelayInMilliseconds;
+    private readonly int _maxBackoffDelayInMilliseconds;
+    private readonly int _maxRetryAttempts;
+    private readonly AsyncRetryPolicy _retryPolicy;
 
     public MqttDataSink(
         ILogger logger,        
         MqttSessionClient mqttSessionClient,
         int initialBackoffDelayInMilliseconds = 500,
-        int maxBackoffDelayInMilliseconds = 10_000)
+        int maxBackoffDelayInMilliseconds = 10_000,
+        int maxRetryAttempts = 10)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));        
         _mqttSessionClient = mqttSessionClient ?? throw new ArgumentNullException(nameof(mqttSessionClient));
         _initialBackoffDelayInMilliseconds = initialBackoffDelayInMilliseconds;
         _maxBackoffDelayInMilliseconds = maxBackoffDelayInMilliseconds;
+        _maxRetryAttempts = maxRetryAttempts;
+        
+        // Configure Polly retry policy once during initialization
+        // TODO: Create a base class and move this to base class
+        _retryPolicy = Policy
+            .Handle<MqttCommunicationException>()
+            .WaitAndRetryAsync(
+                retryCount: _maxRetryAttempts,
+                sleepDurationProvider: (retryAttempt, context) => 
+                {
+                    // Calculate exponential backoff with jitter
+                    var exponentialBackoff = TimeSpan.FromMilliseconds(
+                        Math.Min(
+                            _initialBackoffDelayInMilliseconds * Math.Pow(1.5, retryAttempt),
+                            _maxBackoffDelayInMilliseconds
+                        )
+                    );
+                    
+                    // Add small random jitter to prevent multiple clients retrying simultaneously
+                    return exponentialBackoff + TimeSpan.FromMilliseconds(new Random().Next(0, 100));
+                },
+                onRetryAsync: async (exception, timeSpan, retryCount, context) => 
+                {
+                    _logger.LogError(exception, "Error publishing data to MQTT broker, topic: '{Topic}', attempt {RetryCount}, retrying after {RetryDelay}ms...", 
+                        context["topic"], retryCount, timeSpan.TotalMilliseconds);
+                    
+                    await _mqttSessionClient.ReconnectAsync();
+                }
+            );
     }
 
     public async Task PushDataAsync(string key, JsonDocument data, CancellationToken stoppingToken)
@@ -36,32 +70,15 @@ public class MqttDataSink : IDataSink
             // Note: add standardized user properties based on cloud event extensions in AIO.
         };
 
-        // Publish data to the MQTT broker until successful.
-        var successfulPublish = false;
-        int backoff_delay_in_milliseconds = _initialBackoffDelayInMilliseconds;
-        while (!successfulPublish)
+        var context = new Context
         {
-            try
-            {
-                await _mqttSessionClient.PublishAsync(mqtt_application_message, stoppingToken);
-                _logger.LogTrace("Published data to MQTT broker, topic: '{topic}'.", key);
+            ["topic"] = key
+        };
 
-                // Reset backoff delay on successful data processing.
-                backoff_delay_in_milliseconds = _initialBackoffDelayInMilliseconds;
-                successfulPublish = true;
-            }
-            catch (MqttCommunicationException ex)
-            {
-                _logger.LogError(ex, "Error publishing data to MQTT broker, topic: '{topic}', reconnecting...", key);
-
-                await Task.Delay(backoff_delay_in_milliseconds);
-                backoff_delay_in_milliseconds = (int)Math.Pow(backoff_delay_in_milliseconds, 1.02);
-
-                // Limit backoff delay to _maxBackoffDelayInMilliseconds.
-                backoff_delay_in_milliseconds = backoff_delay_in_milliseconds > _maxBackoffDelayInMilliseconds ? _maxBackoffDelayInMilliseconds : backoff_delay_in_milliseconds;
-
-                await _mqttSessionClient.ReconnectAsync();
-            }
-        }       
+        await _retryPolicy.ExecuteAsync(async (ctx) => 
+        {
+            await _mqttSessionClient.PublishAsync(mqtt_application_message, stoppingToken);
+            _logger.LogTrace("Published data to MQTT broker, topic: '{topic}'.", key);
+        }, context);
     }
 }

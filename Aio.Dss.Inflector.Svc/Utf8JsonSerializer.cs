@@ -1,9 +1,7 @@
 namespace Aio.Dss.Inflector.Svc;
 
 using System.Buffers;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Protocol.Models;
 
@@ -14,26 +12,12 @@ public class EmptyJson
 public class Utf8JsonSerializer : IPayloadSerializer
 {
     protected static readonly JsonSerializerOptions jsonSerializerOptions = new()
-    {        
+    {
     };
 
     public const string ContentType = "application/json";
 
     public const MqttPayloadFormatIndicator PayloadFormatIndicator = MqttPayloadFormatIndicator.CharacterData;
-
-
-    // SerializedPayloadContext IPayloadSerializer.ToBytes<T>(T? payload) where T : class
-    // {
-    //     try
-    //     {
-    //         var serializedBytes = JsonSerializer.SerializeToUtf8Bytes(payload, jsonSerializerOptions);
-    //         return new SerializedPayloadContext(serializedBytes, ContentType, PayloadFormatIndicator);
-    //     }
-    //     catch (Exception)
-    //     {
-    //         throw AkriMqttException.GetPayloadInvalidException();
-    //     }
-    // }
 
     public SerializedPayloadContext ToBytes<T>(T? payload)
         where T : class

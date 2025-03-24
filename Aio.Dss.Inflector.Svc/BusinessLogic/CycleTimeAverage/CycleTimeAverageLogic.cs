@@ -1,7 +1,10 @@
+namespace Aio.Dss.Inflector.Svc.BusinessLogic.CycleTimeAverage;
+
 using System.Text.Json;
 using Aio.Dss.Inflector.Svc;
+using Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
 
-public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
+public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
 {
     private readonly ILogger<CycleTimeAverageLogic> _logger;
     private readonly string _dssKeyShiftsReference;
@@ -84,8 +87,6 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                             payload = new
                             {
                                 specVersion = "1.0",
-                                type = "StationAttribute.Value.Updated.v1",
-                                source = "poc/localuns/microsoft/avgCycleTime",
                                 id = Guid.NewGuid(),
                                 time = cycleTime.SourceTimestamp,
                                 data = new
@@ -93,11 +94,7 @@ public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
                                     siteId = shiftReference.SiteId,
                                     areaId = shiftReference.AreaId,
                                     equipmentId = shiftReference.EquipmentId,
-                                    stationId = "302374d7-033d-45f9-990d-745680d96326",
-                                    stationAttributeId = "f263a248-cf54-4a9f-b54f-6101367c8775",
-                                    esmiGroupCode = 2,
-                                    esmiSubGroupCode = 3,
-                                    attributeName = "lr_avgCycleTime",
+                                    attributeName = "AvgCycleTime",
                                     attributeValue = average,
                                     attributeValueType = "double",
                                     attributeTime = DateTime.UtcNow

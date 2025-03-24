@@ -1,3 +1,5 @@
+namespace Aio.Dss.Inflector.Svc;
+
 using System.Text.Json;
 
 public interface IDataSource
