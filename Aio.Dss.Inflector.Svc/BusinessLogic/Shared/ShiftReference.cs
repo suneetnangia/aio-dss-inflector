@@ -1,3 +1,5 @@
+namespace Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
+
 public class ShiftReference
 {
     public Guid Id { get; set; }

@@ -1,7 +1,10 @@
+namespace Aio.Dss.Inflector.Svc.BusinessLogic.CycleTimeAverage;
+
 using System.Text.Json;
 using Aio.Dss.Inflector.Svc;
+using Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
 
-public class CycleTimeAverageLogic : BaseLogic, IInflectorActionLogic
+public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
 {
     private readonly ILogger<CycleTimeAverageLogic> _logger;
     private readonly string _dssKeyShiftsReference;

@@ -1,6 +1,6 @@
-using System.Text.Json;
+using Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
 
-public abstract class BaseLogic
+public abstract class Logic
 {
     private int GetDayOfWeekInt(DateTime timestamp)
     {

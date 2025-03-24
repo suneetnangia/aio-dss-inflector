@@ -1,7 +1,10 @@
+namespace Aio.Dss.Inflector.Svc.BusinessLogic.ShiftCounter;
+
 using System.Text.Json;
 using Aio.Dss.Inflector.Svc;
+using Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
 
-public class TotalCounterLogic : BaseLogic, IInflectorActionLogic
+public class TotalCounterLogic : Logic, IInflectorActionLogic
 {
     private readonly ILogger<TotalCounterLogic> _logger;
     private readonly string _dssKeyShiftsReference;
