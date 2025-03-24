@@ -16,21 +16,22 @@ Follow these steps to deploy this solution:
 
 2. Run Inflector in existing AIO environment
 
-    1. Create a local connection to your AIO deployment in Azure (assuming you have run `az login` already and have an Azure AIO deployment)
+    1. Open the solution in the devcontainer in VSCode.
+    2. Create a local connection to your AIO deployment in Azure (assuming you have run `az login` already and have an Azure AIO deployment)
 
         `az connectedk8s proxy -n <Arc Connected Cluster> -g <Arc Connected Cluster Resource Group>`
 
-    2. Confgiure AIO's MQTT Broker for local access (assuming we have a non-auth/non-TLS Broker Listener at 1883 [configured in AIO](https://learn.microsoft.com/en-us/azure/iot-operations/manage-mqtt-broker/howto-configure-brokerlistener?tabs=portal%2Ctest#example-create-a-new-listener-with-two-ports))
+    3. Confgiure AIO's MQTT Broker for local access (assuming we have a non-auth/non-TLS Broker Listener at 1883 [configured in AIO](https://learn.microsoft.com/en-us/azure/iot-operations/manage-mqtt-broker/howto-configure-brokerlistener?tabs=portal%2Ctest#example-create-a-new-listener-with-two-ports))
 
         `kubectl port-forward svc/aio-broker 1883:1883 -n azure-iot-operations`
 
-    3. Run the project (run each cmd in different terminal window)
+    4. Run the project (run each cmd in different terminal window)
 
         1. `make run-service`
-        2. `make pub`
-        3. `make sub`
+        2. `make sub`
+        3. `make pub`
 
-    4. Observe the terminal windows above for message processing details.
+    5. Observe the terminal windows above for message processing details.
 
 ### Sample `appsettings.json` File for Production
 
