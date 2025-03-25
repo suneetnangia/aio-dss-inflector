@@ -1,0 +1,16 @@
+// Reference: https://code.visualstudio.com/docs/copilot/copilot-settings
+{
+    "github.copilot.chat.codeGeneration.instructions": [
+        {
+            "file": "./README.md",
+        },
+        {
+            "file": "../docs/code-generation.md",
+        }
+    ],
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "text": "Write the most important changes in the commit message, including breaking changes.",
+        }
+    ]
+}
