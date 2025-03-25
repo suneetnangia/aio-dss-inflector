@@ -11,7 +11,7 @@ packages/
 *.suo
 *.user
 *.sln.docstates
-settings.json
+# settings.json
 appsettings.Production.json
 
 # Ignore ReSharper files

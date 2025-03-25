@@ -6,7 +6,7 @@ MQTT_BROKER = localhost
 MQTT_PORT = 1883
 DEFAULT_INGRESS_TOPIC = aio-dss-inflector/data/ingress
 DEFAULT_EGRESS_TOPIC = aio-dss-inflector/data/egress
-DEFAULT_MESSAGE = '{ "correlationId": "e8e1d420-a070-4673-89a6-c23744388ee4",  "action": 1, "actionRequestDataPayload":  {"CycleTime": { "SourceTimestamp": "2025-02-19T14:34:38.3250966Z", "Value": 28 }}, "passthroughPayload": { "keyA": "valueA", "keyB": "valueB" }}'
+DEFAULT_MESSAGE = '{ "correlationId": "e8e1d420-a070-4673-89a6-c23744388ee4",  "action": 1, "actionRequestDataPayload":  {"CycleTime": { "SourceTimestamp": "2025-02-19T14:34:38.3250966Z", "Value": 29 }}, "passthroughPayload": { "keyA": "valueA", "keyB": "valueB" }}'
 
 # Help command
 .PHONY: help
@@ -19,8 +19,13 @@ help:
 
 # Run the service
 .PHONY: run-service
-run-service:
+run-service: set-state
 	$(SERVICE_CMD)
+
+# Set a value in the state store
+.PHONY: set-state
+set-state:
+	./tools/statestore-cli set -n localhost -p 1883 -k "shifts" -f "./Aio.Dss.Inflector.Svc/BusinessLogic/samplemessages/dss-reference-data.json" --notls
 
 # Publish default message to MQTT
 .PHONY: pub
