@@ -1,3 +1,5 @@
+namespace Aio.Dss.Inflector.Svc.Tests;
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -8,8 +10,6 @@ using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Protocol.Telemetry;
 using Microsoft.Extensions.Logging;
 using Moq;
-
-namespace Aio.Dss.Inflector.Svc.Tests;
 
 public class WorkerTests
 {
@@ -54,8 +54,10 @@ public class WorkerTests
         _worker = new Worker(
             _mockLogger.Object,
             _mockTelemetryReceiver.Object,
-            new Dictionary<string, IDataSource> { { "DssDataSource", _mockDssDataSource.Object } },
-            new Dictionary<string, IDataSink> { { "DssDataSink", _mockDssDataSink.Object }, { "MqttDataSink", _mockMqttDataSink.Object } },
+            _mockDssDataSource.Object,
+            _mockMqttDataSink.Object,
+            _mockDssDataSink.Object,
+            MQTT_EGRESS_TOPIC,
             actionLogicDictionary);
 
         // Create field for the _ingressHybridMessages collection using reflection
@@ -64,8 +66,7 @@ public class WorkerTests
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         fieldInfo?.SetValue(_worker, new BlockingCollection<IngressHybridMessage>());
 
-
-        _cts = new CancellationTokenSource();    
+        _cts = new CancellationTokenSource();
     }
 
     [Fact]
@@ -178,6 +179,6 @@ public class WorkerTests
             MQTT_EGRESS_TOPIC,
             It.Is<JsonDocument>(doc => JsonSerializer.Serialize(doc, options) == JsonSerializer.Serialize(ingressMessage, options)),
             It.IsAny<CancellationToken>()),
-            Times.Once);      
-    }    
+            Times.Once);
+    }
 }

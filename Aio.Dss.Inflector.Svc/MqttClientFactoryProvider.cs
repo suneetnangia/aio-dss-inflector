@@ -2,6 +2,7 @@ namespace Aio.Dss.Inflector.Svc;
 
 using Azure.Iot.Operations.Mqtt.Session;
 using Azure.Iot.Operations.Protocol.Connection;
+using Azure.Iot.Operations.Protocol.Retry;
 
 public class SessionClientFactory
 {
@@ -26,19 +27,28 @@ public class SessionClientFactory
         _passwordFilePath = passwordFilePath;
     }
 
-    public async Task<MqttSessionClient> GetSessionClient(bool MqttLogging, string clientIdExtension)
+    public async Task<MqttSessionClient> GetSessionClient(
+        bool MqttLogging,
+        string clientIdExtension,
+        uint maxRetries,
+        double maxDelayInMilliseconds,
+        bool jitter,
+        double connectionTimeoutInMilliseconds)
     {
+        ArgumentNullException.ThrowIfNull(clientIdExtension);
+
+        // Log file locations
+        _logger.LogInformation("MQTT DSS token file location: '{file}'.", _satFilePath);
         _logger.LogInformation("MQTT SAT token file location: '{file}'.", _satFilePath);
         _logger.LogInformation("CA cert file location: '{file}'.", _caFilePath);
-        _logger.LogInformation("Password file location: '{file}'.", _passwordFilePath);
+        _logger.LogInformation("Password file location: '{file}'.", _passwordFilePath);        
 
-        // To be discussed: 
+        // Note:
         // QoS1 setting for subscribers with TelemetryReceiver - review
         // CleanStart= is set to true by default - we want to set false when subscribing with QoS1 so not to lose any messages upon restart/rolling update
-
         MqttConnectionSettings connectionSettings = new(_host)
         {
-            TcpPort = _port,            
+            TcpPort = _port,
             ClientId = "AIO-DSS-Inflector-" + clientIdExtension,
             UseTls = _useTls,
             Username = _username,
@@ -48,10 +58,15 @@ public class SessionClientFactory
         };
 
         _logger.LogInformation("Connecting to: {settings}", connectionSettings);
-        
-        MqttSessionClient sessionClient = new(new MqttSessionClientOptions() { EnableMqttLogging = MqttLogging });
-        await sessionClient.ConnectAsync(connectionSettings);
 
+        MqttSessionClient sessionClient = new(new MqttSessionClientOptions()
+        {
+            ConnectionRetryPolicy = new ExponentialBackoffRetryPolicy(maxRetries, TimeSpan.FromMilliseconds(maxDelayInMilliseconds), jitter),
+            ConnectionAttemptTimeout = TimeSpan.FromMilliseconds(connectionTimeoutInMilliseconds),
+            EnableMqttLogging = MqttLogging
+        });
+
+        await sessionClient.ConnectAsync(connectionSettings);
         return sessionClient;
     }
 }

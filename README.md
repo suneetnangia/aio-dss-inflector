@@ -46,7 +46,29 @@ Follow these steps to deploy this solution:
     "Password": "",
     "SatFilePath": "/var/run/secrets/tokens/broker-sat",
     "CaFilePath": "/var/run/certs/ca.crt",
-    "ClientId": "Aio.Dss.Inflector.Svc"
+    "ClientId": "prod-001"
+  },
+  "MqttDataSource": {
+    "TopicNamespace": "aio-dss-inflector/data/ingress"
+  },
+  "MqttDataSink": {
+    "MaxRetries": 1000,
+    "MaxDelayInMillseconds": 20000,
+    "Jitter": true,
+    "TimeoutInMilliseconds": 10000,
+    "Topic": "aio-dss-inflector/data/egress/endpoint001"
+  },
+  "DssDataSource": {
+    "MaxRetries": 1000,
+    "MaxDelayInMillseconds": 20000,
+    "Jitter": true,
+    "TimeoutInMilliseconds": 10000    
+  },
+  "DssDataSink": {
+    "MaxRetries": 1000,
+    "MaxDelayInMillseconds": 20000,
+    "Jitter": true,
+    "TimeoutInMilliseconds": 10000    
   },
   "Logging": {
     "LogLevel": {

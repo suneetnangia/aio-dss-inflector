@@ -5,8 +5,12 @@
             "file": "./README.md",
         },
         {
-            "file": "../docs/code-generation.md",
+            "file": "./docs/code-generation.md",
+        },
+        {
+            "file": "./docs/unit-test-generation.md",
         }
+
     ],
     "github.copilot.chat.commitMessageGeneration.instructions": [
         {

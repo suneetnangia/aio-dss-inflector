@@ -4,8 +4,12 @@ namespace Aio.Dss.Inflector.Svc;
 public class MqttOptions
 {
     public const string Mqtt = "Mqtt";
-    public required bool Logging { get; set; }
-    public required string Host { get; set; }
+    public required bool Logging { get; set; } = false;
+    public required uint MaxRetries { get; set; } = uint.MaxValue;
+    public required double MaxDelayInMilliseconds { get; set; } = 1000 * 20;
+    public required bool Jitter { get; set; } = true;
+    public required double ConnectionTimeoutInSMilliseconds { get; set; } = 1000 * 10;
+    public required string Host { get; set; } = "localhost";
     public int Port { get; set; } = 1883;
     public bool UseTls { get; set; } = false;
     public required string Username { get; set; }

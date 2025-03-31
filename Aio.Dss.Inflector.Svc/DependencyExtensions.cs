@@ -6,14 +6,17 @@ using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Protocol.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.Retry;
 
 public static class DependencyExtensions
 {
     private const string MQTT_READ_CLIENT_ID_PREFIX = "MQTT-Read";
     private const string MQTT_WRITE_CLIENT_ID_PREFIX = "MQTT-Write";
     private const string DSS_READ_CLIENT_ID_PREFIX = "DSS-Read";
-    private const string DSS_WRITE_CLIENT_ID_PREFIX = "DSS-Write";    
+    private const string DSS_WRITE_CLIENT_ID_PREFIX = "DSS-Write";
 
     public static IServiceCollection AddConfig(
          this IServiceCollection services, IConfiguration config)
@@ -25,6 +28,18 @@ public static class DependencyExtensions
 
         services.Configure<MqttOptions>(
              config.GetSection(MqttOptions.Mqtt));
+
+        services.Configure<MqttDataSinkOptions>(
+             config.GetSection(MqttDataSinkOptions.MqttDataSink));
+
+        services.Configure<MqttDataSourceOptions>(
+             config.GetSection(MqttDataSourceOptions.MqttDataSource));
+
+        services.Configure<DssDataSinkOptions>(
+            config.GetSection(DssDataSinkOptions.DssDataSink));
+
+        services.Configure<DssDataSourceOptions>(
+            config.GetSection(DssDataSourceOptions.DssDataSource));
 
         return services;
     }
@@ -51,68 +66,105 @@ public static class DependencyExtensions
         services.AddSingleton<TelemetryReceiver<IngressHybridMessage>>(provider =>
         {
             var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>();
+            var mqttDataSourceOptions = provider.GetRequiredService<IOptions<MqttDataSourceOptions>>();
             var applicationContext = provider.GetRequiredService<ApplicationContext>();
-            var sessionClient = provider
-                .GetRequiredService<SessionClientFactory>()
-                .GetSessionClient(mqttOptions.Value.Logging, $"{MQTT_READ_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}")
-                .GetAwaiter()
-                .GetResult();
+            
+            var sessionClient = CreateSessionClient(
+                provider,
+                $"{MQTT_READ_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}");
 
-            return new HybridMessageReceiver(applicationContext, sessionClient);
+            var hybridMessageReceiver = new HybridMessageReceiver(applicationContext, sessionClient);            
+            hybridMessageReceiver.TopicNamespace  = mqttDataSourceOptions.Value.TopicNamespace;
+
+            return hybridMessageReceiver;
         });
 
-        services.AddSingleton(provider =>
-        {
-            var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>();
-            var dssSessionClient = provider
-                .GetRequiredService<SessionClientFactory>()
-                .GetSessionClient(mqttOptions.Value.Logging, $"{DSS_READ_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}")
-                .GetAwaiter()
-                .GetResult();
-
-            var applicationContext = provider.GetRequiredService<ApplicationContext>();
-            var dssDataSink = new DssDataSource(
-                provider.GetRequiredService<ILogger<DssDataSource>>(),
-                dssSessionClient,
-                applicationContext);
-
-            return new Dictionary<string, IDataSource>
+        services.TryAddKeyedSingleton<IDataSource>(
+            Constants.DSS_DATA_SOURCE_KEY,
+            (provider, serviceKey) =>
             {
-                { Constants.DSS_DATA_SOURCE_KEY, dssDataSink },
-            };
-        });
+                var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>();
+                var dssDataSourceOptions = provider.GetRequiredService<IOptions<DssDataSourceOptions>>();
+                var applicationContext = provider.GetRequiredService<ApplicationContext>();
 
-        services.AddSingleton(provider =>
-        {
-            var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>();
-            var dssSessionClient = provider
-                .GetRequiredService<SessionClientFactory>()
-                .GetSessionClient(mqttOptions.Value.Logging, $"{DSS_WRITE_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}")
-                .GetAwaiter()
-                .GetResult();
+                var dssSessionClient = CreateSessionClient(
+                    provider,
+                    $"{DSS_READ_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}");
 
-            var applicationContext = provider.GetRequiredService<ApplicationContext>();
-            var dssDataSink = new DssDataSink(
-                provider.GetRequiredService<ILogger<DssDataSink>>(),
-                dssSessionClient,
-                applicationContext);
+                var resiliencePipeline = CreateResiliencePipeline<DssDataSource>(
+                    provider,
+                    dssDataSourceOptions.Value.MaxRetries,
+                    TimeSpan.FromMilliseconds(dssDataSourceOptions.Value.MaxDelayInMilliseconds),
+                    TimeSpan.FromMilliseconds(dssDataSourceOptions.Value.TimeoutInMilliseconds),
+                    dssDataSourceOptions.Value.Jitter);
 
-            var mqttSessionClient = provider
-                .GetRequiredService<SessionClientFactory>()
-                .GetSessionClient(mqttOptions.Value.Logging, $"{MQTT_WRITE_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}")
-                .GetAwaiter()
-                .GetResult();
+                return new DssDataSource(
+                    provider.GetRequiredService<ILogger<DssDataSource>>(),
+                    dssSessionClient,
+                    applicationContext,
+                    resiliencePipeline);
+            });
 
-            var mqttDataSink = new MqttDataSink(
-                provider.GetRequiredService<ILogger<MqttDataSink>>(),
-                mqttSessionClient);
-
-            return new Dictionary<string, IDataSink>
+        services.TryAddKeyedSingleton<IDataSink>(
+            Constants.DSS_DATA_SINK_KEY,
+            (provider, serviceKey) =>
             {
-                { Constants.DSS_DATA_SINK_KEY, dssDataSink },
-                { Constants.MQTT_DATA_SINK_KEY, mqttDataSink }
-            };
-        });
+                var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>();
+                var dssDataSinkOptions = provider.GetRequiredService<IOptions<DssDataSinkOptions>>();
+                var applicationContext = provider.GetRequiredService<ApplicationContext>();
+
+                var dssSessionClient = CreateSessionClient(
+                    provider,
+                    $"{DSS_WRITE_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}");
+
+                var dssResiliencePipeline = CreateResiliencePipeline<DssDataSink>(
+                    provider,
+                    dssDataSinkOptions.Value.MaxRetries,
+                    TimeSpan.FromMilliseconds(dssDataSinkOptions.Value.MaxDelayInMilliseconds),
+                    TimeSpan.FromMilliseconds(dssDataSinkOptions.Value.TimeoutInMilliseconds),
+                    dssDataSinkOptions.Value.Jitter);
+
+                return new DssDataSink(
+                    provider.GetRequiredService<ILogger<DssDataSink>>(),
+                    dssSessionClient,
+                    applicationContext,
+                    dssResiliencePipeline);
+            });
+
+        services.TryAddKeyedSingleton<IDataSink>(
+            Constants.MQTT_DATA_SINK_KEY,
+            (provider, serviceKey) =>
+            {
+                var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>();
+                var mqttDataSinkOptions = provider.GetRequiredService<IOptions<MqttDataSinkOptions>>();
+                var applicationContext = provider.GetRequiredService<ApplicationContext>();
+
+                var mqttSessionClient = CreateSessionClient(
+                    provider,
+                    $"{MQTT_WRITE_CLIENT_ID_PREFIX}{mqttOptions.Value.ClientId}");
+
+                var mqttResiliencePipeline = CreateResiliencePipeline<MqttDataSink>(
+                    provider,
+                    mqttDataSinkOptions.Value.MaxRetries,
+                    TimeSpan.FromMilliseconds(mqttDataSinkOptions.Value.MaxDelayInMilliseconds),
+                    TimeSpan.FromMilliseconds(mqttDataSinkOptions.Value.TimeoutInMilliseconds),
+                    mqttDataSinkOptions.Value.Jitter
+                    );
+
+                return new MqttDataSink(
+                    provider.GetRequiredService<ILogger<MqttDataSink>>(),
+                    mqttSessionClient,
+                    mqttResiliencePipeline);
+            });
+
+        services.TryAddKeyedSingleton<string>(
+            Constants.MQTT_EGRESS_TOPIC,
+            (provider, serviceKey) =>
+                {
+                    var mqttDataSinkOptions = provider.GetRequiredService<IOptions<MqttDataSinkOptions>>();
+                    return mqttDataSinkOptions.Value.Topic;
+                }
+           );
 
         services.AddSingleton(provider =>
         {
@@ -124,5 +176,59 @@ public static class DependencyExtensions
         });
 
         return services;
+    }
+
+    private static IMqttPubSubClient CreateSessionClient(IServiceProvider provider, string clientId)
+    {
+        var mqttOptions = provider.GetRequiredService<IOptions<MqttOptions>>().Value;
+
+        return provider
+            .GetRequiredService<SessionClientFactory>()
+            .GetSessionClient(
+                mqttOptions.Logging,
+                clientId,
+                mqttOptions.MaxRetries,
+                mqttOptions.MaxDelayInMilliseconds,
+                mqttOptions.Jitter,
+                mqttOptions.ConnectionTimeoutInSMilliseconds)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    private static ResiliencePipeline CreateResiliencePipeline<T>(
+        IServiceProvider provider,
+        int maxRetryAttempts,
+        TimeSpan maxDelay,
+        TimeSpan timeout,
+        bool jitter)
+    {
+        return CreateResiliencePipeline(provider, typeof(T), maxRetryAttempts, maxDelay, timeout, jitter);
+    }
+
+    private static ResiliencePipeline CreateResiliencePipeline(
+        IServiceProvider provider,
+        Type loggerType,
+        int maxRetryAttempts,
+        TimeSpan maxDelay,
+        TimeSpan timeout,
+        bool jitter)
+    {
+        return new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions()
+            {
+                MaxRetryAttempts = maxRetryAttempts,
+                UseJitter = jitter,
+                MaxDelay = maxDelay,
+                BackoffType = DelayBackoffType.Exponential,
+                OnRetry = args =>
+                {
+                    var logger = (ILogger)provider.GetRequiredService(typeof(ILogger<>).MakeGenericType(loggerType));
+                    logger.LogWarning("Polly is retrying operation. Attempt {attempt}. Exception: {exception}",
+                        args.AttemptNumber, args.Outcome.Exception);
+                    return ValueTask.CompletedTask;
+                }
+            })
+            .AddTimeout(timeout)
+            .Build();
     }
 }

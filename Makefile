@@ -4,18 +4,21 @@
 SERVICE_CMD = dotnet run --project Aio.Dss.Inflector.Svc
 MQTT_BROKER = localhost
 MQTT_PORT = 1883
-DEFAULT_INGRESS_TOPIC = aio-dss-inflector/data/ingress
-DEFAULT_EGRESS_TOPIC = aio-dss-inflector/data/egress
-DEFAULT_MESSAGE = '{ "correlationId": "e8e1d420-a070-4673-89a6-c23744388ee4",  "action": 1, "actionRequestDataPayload":  {"CycleTime": { "SourceTimestamp": "2025-02-19T14:34:38.3250966Z", "Value": 29 }}, "passthroughPayload": { "keyA": "valueA", "keyB": "valueB" }}'
+DEFAULT_INGRESS_TOPIC = aio-dss-inflector/data/ingress/endpoint001
+DEFAULT_EGRESS_TOPIC = aio-dss-inflector/data/egress/endpoint001
+DOCKER_IMAGE_NAME = aio-dss-inflector
+DOCKER_TAG = latest
 
 # Help command
 .PHONY: help
 help:
 	@echo "Available commands:"
+	@echo "  make set-state	 	 - Sets reference data in the state store"
 	@echo "  make run-service    - Run the Aio.Dss.Inflector.Svc"
 	@echo "  make pub            - Publish default message to MQTT"
 	@echo "  make pub-custom     - Publish custom message (use TOPIC=... MSG=...)"
-	@echo "  make sub            - Subscribe to default MQTT topic"	
+	@echo "  make sub            - Subscribe to default MQTT topic"
+	@echo "  make docker-build   - Build Docker image (use TAG=... to override tag)"
 
 # Run the service
 .PHONY: run-service
@@ -30,7 +33,7 @@ set-state:
 # Publish default message to MQTT
 .PHONY: pub
 pub:
-	mosquitto_pub -q 1 -h $(MQTT_BROKER) -p $(MQTT_PORT) -t $(DEFAULT_INGRESS_TOPIC) -m $(DEFAULT_MESSAGE)
+	mosquitto_pub -q 1 -h $(MQTT_BROKER) -p $(MQTT_PORT) -t $(DEFAULT_INGRESS_TOPIC) -f "./Aio.Dss.Inflector.Svc/BusinessLogic/samplemessages/ingress-cycletime-1.json"
 
 # Publish custom message to MQTT
 .PHONY: pub-custom
@@ -43,3 +46,9 @@ pub-custom:
 .PHONY: sub
 sub:
 	mosquitto_sub -q 1 -h $(MQTT_BROKER) -p $(MQTT_PORT) -t $(DEFAULT_EGRESS_TOPIC) -v
+
+# Build Docker image
+.PHONY: docker-build
+docker-build:
+	@echo "Building Docker image $(DOCKER_IMAGE_NAME):$(if $(TAG),$(TAG),$(DOCKER_TAG))"
+	docker build --progress=plain -t $(DOCKER_IMAGE_NAME):$(if $(TAG),$(TAG),$(DOCKER_TAG)) .
