@@ -4,7 +4,7 @@ using Azure.Iot.Operations.Mqtt.Session;
 using Azure.Iot.Operations.Protocol.Connection;
 using Azure.Iot.Operations.Protocol.Retry;
 
-public class SessionClientFactory
+public class MqttClientFactoryProvider
 {
     private readonly ILogger _logger;
     private readonly string _host;
@@ -15,7 +15,7 @@ public class SessionClientFactory
     private readonly string _caFilePath;
     private readonly string _passwordFilePath;
 
-    public SessionClientFactory(ILogger<SessionClientFactory> logger, string host, int port, bool useTls, string username, string satFilePath, string caFilePath, string passwordFilePath)
+    public MqttClientFactoryProvider(ILogger<MqttClientFactoryProvider> logger, string host, int port, bool useTls, string username, string satFilePath, string caFilePath, string passwordFilePath)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _host = host ?? throw new ArgumentNullException(nameof(host));
@@ -28,7 +28,7 @@ public class SessionClientFactory
     }
 
     public async Task<MqttSessionClient> GetSessionClient(
-        bool MqttLogging,
+        bool mqttLogging,
         string clientIdExtension,
         uint maxRetries,
         double maxDelayInMilliseconds,
@@ -41,7 +41,7 @@ public class SessionClientFactory
         _logger.LogInformation("MQTT DSS token file location: '{file}'.", _satFilePath);
         _logger.LogInformation("MQTT SAT token file location: '{file}'.", _satFilePath);
         _logger.LogInformation("CA cert file location: '{file}'.", _caFilePath);
-        _logger.LogInformation("Password file location: '{file}'.", _passwordFilePath);        
+        _logger.LogInformation("Password file location: '{file}'.", _passwordFilePath);
 
         // Note:
         // QoS1 setting for subscribers with TelemetryReceiver - review
@@ -63,7 +63,7 @@ public class SessionClientFactory
         {
             ConnectionRetryPolicy = new ExponentialBackoffRetryPolicy(maxRetries, TimeSpan.FromMilliseconds(maxDelayInMilliseconds), jitter),
             ConnectionAttemptTimeout = TimeSpan.FromMilliseconds(connectionTimeoutInMilliseconds),
-            EnableMqttLogging = MqttLogging
+            EnableMqttLogging = mqttLogging
         });
 
         await sessionClient.ConnectAsync(connectionSettings);

@@ -12,6 +12,7 @@ public class DssDataSource : IDataSource
     private readonly IMqttPubSubClient _mqttSessionClient;
     private readonly ApplicationContext _applicationContext;
     private readonly ResiliencePipeline _resiliencePipeline;
+    private bool _disposed;
 
     public DssDataSource(
         ILogger logger,
@@ -22,7 +23,19 @@ public class DssDataSource : IDataSource
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mqttSessionClient = mqttSessionClient ?? throw new ArgumentNullException(nameof(mqttSessionClient));
         _applicationContext = applicationContext ?? throw new ArgumentNullException(nameof(applicationContext));
-        _resiliencePipeline = resiliencePipeline ?? throw new ArgumentNullException(nameof(resiliencePipeline));        
+        _resiliencePipeline = resiliencePipeline ?? throw new ArgumentNullException(nameof(resiliencePipeline));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposed)
+        {
+            // Await async cleanup operations
+            await _mqttSessionClient.DisposeAsync();
+            _disposed = true;
+        }
+
+        GC.SuppressFinalize(this);
     }
 
     // Note - Evaluate if we want to change the signature of the interface to return string/bytes instead of JsonDocument
@@ -30,15 +43,19 @@ public class DssDataSource : IDataSource
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(stoppingToken);
-      
-        return await _resiliencePipeline.ExecuteAsync<JsonDocument>(async cancellationToken =>
+
+        return await _resiliencePipeline.ExecuteAsync<JsonDocument>(
+            async cancellationToken =>
         {
             await using StateStoreClient stateStoreClient = new(_applicationContext, _mqttSessionClient);
 
             // Read the data for the provided key in the state store.
             var dssResponse = await stateStoreClient.GetAsync(key, null, stoppingToken);
-            _logger.LogTrace("Read data from DSS store for key: '{Key}', returned version '{Version}', data '{Value}'.",
-                key, dssResponse.Version, dssResponse.Value);
+            _logger.LogTrace(
+                "Read data from DSS store for key: '{Key}', returned version '{Version}', data '{Value}'.",
+                key,
+                dssResponse.Version,
+                dssResponse.Value);
 
             if (dssResponse.Value == null)
             {
@@ -53,7 +70,7 @@ public class DssDataSource : IDataSource
                 var dataString = System.Text.Encoding.UTF8.GetString(data);
 
                 // Note currently supporting JsonDocument or JSON Lines per DSS reference format for data flows
-                if (dataString.Contains(Environment.NewLine))
+                if (dataString.Contains(Environment.NewLine, StringComparison.InvariantCultureIgnoreCase))
                 {
                     var jsonArray = new JsonArray();
                     foreach (var line in dataString.Split(Environment.NewLine))
@@ -63,6 +80,7 @@ public class DssDataSource : IDataSource
                             jsonArray.Add(JsonDocument.Parse(line).RootElement.Clone());
                         }
                     }
+
                     return JsonDocument.Parse(jsonArray.ToString());
                 }
                 else
@@ -77,6 +95,7 @@ public class DssDataSource : IDataSource
                 // Key not found is not an error, could be first use
                 return JsonDocument.Parse("{}");
             }
-        }, stoppingToken);
+        },
+            stoppingToken);
     }
 }

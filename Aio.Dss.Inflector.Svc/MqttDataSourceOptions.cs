@@ -7,7 +7,7 @@ public class MqttDataSourceOptions
 
     /// <summary>
     /// Topic namespace for the MQTT data source i.e topic is formed by {TopicNamespace}/{endpoint001}
-    //  where 'endpoint001' is configured in HybridMessageReceiver class.
+    /// where 'endpoint001' is configured in HybridMessageReceiver class.
     /// </summary>
     public required string TopicNamespace { get; set; } = "aio-dss-inflector/data/ingress";
 }

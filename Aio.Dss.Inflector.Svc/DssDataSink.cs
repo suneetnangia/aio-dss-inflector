@@ -11,6 +11,7 @@ public class DssDataSink : IDataSink
     private readonly IMqttPubSubClient _mqttSessionClient;
     private readonly ApplicationContext _applicationContext;
     private readonly ResiliencePipeline _resiliencePipeline;
+    private bool _disposed;
 
     public DssDataSink(
         ILogger logger,
@@ -21,7 +22,19 @@ public class DssDataSink : IDataSink
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mqttSessionClient = mqttSessionClient ?? throw new ArgumentNullException(nameof(mqttSessionClient));
         _applicationContext = applicationContext ?? throw new ArgumentNullException(nameof(applicationContext));
-        _resiliencePipeline = resiliencePipeline ?? throw new ArgumentNullException(nameof(resiliencePipeline));       
+        _resiliencePipeline = resiliencePipeline ?? throw new ArgumentNullException(nameof(resiliencePipeline));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposed)
+        {
+            // Await async cleanup operations
+            await _mqttSessionClient.DisposeAsync();
+            _disposed = true;
+        }
+
+        GC.SuppressFinalize(this);
     }
 
     public async Task PushDataAsync(string key, JsonDocument data, CancellationToken stoppingToken)
@@ -30,12 +43,14 @@ public class DssDataSink : IDataSink
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(stoppingToken);
 
-        await _resiliencePipeline.ExecuteAsync(async cancellationToken =>
-        {
-            await using StateStoreClient stateStoreClient = new(_applicationContext, _mqttSessionClient);
+        await _resiliencePipeline.ExecuteAsync(
+            async cancellationToken =>
+            {
+                await using StateStoreClient stateStoreClient = new(_applicationContext, _mqttSessionClient);
 
-            // Push the ingress hybrid message to the state store.                    
-            await stateStoreClient.SetAsync(key, JsonSerializer.Serialize(data), null, null, cancellationToken);
-        }, stoppingToken);
+                // Push the ingress hybrid message to the state store.
+                await stateStoreClient.SetAsync(key, JsonSerializer.Serialize(data), null, null, cancellationToken);
+            },
+            stoppingToken);
     }
 }

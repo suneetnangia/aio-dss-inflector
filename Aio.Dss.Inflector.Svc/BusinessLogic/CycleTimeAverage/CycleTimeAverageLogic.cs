@@ -2,7 +2,7 @@ namespace Aio.Dss.Inflector.Svc.BusinessLogic.CycleTimeAverage;
 
 using System.Text.Json;
 using Aio.Dss.Inflector.Svc;
-using Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
+using Aio.Dss.Inflector.Svc.BusinessLogic.Common;
 
 public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
 {
@@ -19,6 +19,11 @@ public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
 
     public async Task<EgressHybridMessage> Execute(IngressHybridMessage message, IDataSource dataSource, IDataSink dataSink, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentNullException.ThrowIfNull(dataSink);
+        ArgumentNullException.ThrowIfNull(cancellationToken);
+
         try
         {
             List<CycleTime> lastTenShifts = new();
@@ -31,7 +36,7 @@ public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
                 var cycleTime = JsonSerializer.Deserialize<CycleTime>(cycleTimeElement.GetRawText());
                 if (cycleTime == null)
                 {
-                    throw new ArgumentNullException(nameof(cycleTime));
+                    throw new ApplicationException("CycleTime data is null.");
                 }
 
                 var dssLastTenShifts = await dataSource.ReadDataAsync(_dssKeyLastTenShifts, cancellationToken);
@@ -77,7 +82,7 @@ public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
                         {
                             throw new InvalidOperationException($"No shift data found for timestamp 'cycleTime.SourceTimestamp'.");
                         }
-                        
+
                         _logger.LogDebug("Shift reference data found for timestamp '{0}': '{1}'", cycleTime.SourceTimestamp, shiftReference);
 
                         // We are hardcoding the resulting message for now...
@@ -129,12 +134,12 @@ public class CycleTimeAverageLogic : Logic, IInflectorActionLogic
             _logger.LogError(ex, "Error processing message: '{message.ActionRequestDataPayload}'", message.ActionRequestDataPayload.RootElement.ToString());
             throw;
         }
-
     }
 
     public class CycleTime
     {
         public DateTime SourceTimestamp { get; set; }
+
         public int Value { get; set; }
     }
 }

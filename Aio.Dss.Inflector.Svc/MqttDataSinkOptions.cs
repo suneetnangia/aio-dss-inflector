@@ -4,9 +4,14 @@ namespace Aio.Dss.Inflector.Svc;
 public class MqttDataSinkOptions
 {
     public const string MqttDataSink = "MqttDataSink";
+
     public required int MaxRetries { get; set; } = 3;
+
     public required double MaxDelayInMilliseconds { get; set; } = 1000 * 20;
+
     public required bool Jitter { get; set; } = true;
+
     public required double TimeoutInMilliseconds { get; set; } = 1000 * 20;
+
     public required string Topic { get; set; } = "aio-dss-inflector/data/egress/endpoint001";
 }

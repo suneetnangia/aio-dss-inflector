@@ -6,16 +6,16 @@ using System.Text.Json.Serialization;
 public class IngressHybridMessage
 {
     [JsonPropertyName("correlationId")]
-    required public string CorrelationId { get; set; }
+    public required string CorrelationId { get; set; }
 
     [JsonPropertyName("action")]
-    required public InflectorAction Action { get; set; }
-    
+    public required InflectorAction Action { get; set; }
+
     [JsonPropertyName("actionRequestDataPayload")]
-    required public JsonDocument ActionRequestDataPayload { get; set; }
+    public required JsonDocument ActionRequestDataPayload { get; set; }
 
     [JsonPropertyName("passthroughPayload")]
-    required public JsonDocument? PassthroughPayload { get; set; }
+    public required JsonDocument? PassthroughPayload { get; set; }
 }
 
 // Sample JSON when this class is deserialized
@@ -33,5 +33,3 @@ public class IngressHybridMessage
     }
 }
 */
-
-

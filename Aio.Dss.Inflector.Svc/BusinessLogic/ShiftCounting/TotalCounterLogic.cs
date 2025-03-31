@@ -1,8 +1,8 @@
-namespace Aio.Dss.Inflector.Svc.BusinessLogic.ShiftCounter;
+namespace Aio.Dss.Inflector.Svc.BusinessLogic.ShiftCounting;
 
 using System.Text.Json;
 using Aio.Dss.Inflector.Svc;
-using Aio.Dss.Inflector.Svc.BusinessLogic.Shared;
+using Aio.Dss.Inflector.Svc.BusinessLogic.Common;
 
 public class TotalCounterLogic : Logic, IInflectorActionLogic
 {
@@ -21,6 +21,11 @@ public class TotalCounterLogic : Logic, IInflectorActionLogic
 
     public async Task<EgressHybridMessage> Execute(IngressHybridMessage message, IDataSource dataSource, IDataSink dataSink, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(dataSource);
+        ArgumentNullException.ThrowIfNull(dataSink);
+        ArgumentNullException.ThrowIfNull(cancellationToken);
+
         try
         {
             _logger.LogTrace("Received message: '{message}'", message.ActionRequestDataPayload.RootElement.ToString());
@@ -30,13 +35,13 @@ public class TotalCounterLogic : Logic, IInflectorActionLogic
                 var totalCounter = JsonSerializer.Deserialize<TotalCounter>(totalCounterElement.GetRawText());
                 if (totalCounter == null)
                 {
-                    throw new ArgumentNullException(nameof(totalCounter));
+                    throw new ApplicationException("TotalCounter data is null.");
                 }
 
                 var referenceData = await dataSource.ReadDataAsync(_dssKeyShiftsReference, cancellationToken);
-                
+
                 _logger.LogTrace("Reference data found in DSS for key: '{key}': '{root}'", _dssKeyShiftsReference, referenceData.RootElement.ToString());
-                
+
                 if (referenceData != null && referenceData.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     var shiftData = JsonSerializer.Deserialize<List<ShiftReference>>(referenceData.RootElement.ToString());
@@ -95,6 +100,7 @@ public class TotalCounterLogic : Logic, IInflectorActionLogic
                             {
                                 lastLoggedPreviousShiftTotalCounterValue = lkvShiftCounterData.Value;
                             }
+
                             await dataSink.PushDataAsync(_dssKeyPreviousShiftCounter, JsonDocument.Parse(JsonSerializer.Serialize(lkvShiftCounterData)), cancellationToken);
                         }
                     }
@@ -152,15 +158,7 @@ public class TotalCounterLogic : Logic, IInflectorActionLogic
     public class TotalCounter
     {
         public DateTime SourceTimestamp { get; set; }
-        public int Value { get; set; }
-    }
 
-    public class ShiftCounter
-    {
-        public Guid ShiftNumber { get; set; }
-        public int DayOfWeek { get; set; }
-        public TimeSpan StartTime { get; set; }
-        public TimeSpan EndTime { get; set; }
         public int Value { get; set; }
     }
 }

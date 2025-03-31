@@ -2,6 +2,7 @@ namespace Aio.Dss.Inflector.Svc;
 
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Protocol.Models;
 using Polly;
@@ -11,6 +12,7 @@ public class MqttDataSink : IDataSink
     private readonly ILogger _logger;
     private readonly IMqttPubSubClient _mqttSessionClient;
     private readonly ResiliencePipeline _resiliencePipeline;
+    private bool _disposed;
 
     public MqttDataSink(
         ILogger logger,
@@ -22,6 +24,18 @@ public class MqttDataSink : IDataSink
         _resiliencePipeline = resiliencePipeline ?? throw new ArgumentNullException(nameof(resiliencePipeline));
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposed)
+        {
+            // Await async cleanup operations
+            await _mqttSessionClient.DisposeAsync();
+            _disposed = true;
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
     public async Task PushDataAsync(string key, JsonDocument data, CancellationToken stoppingToken)
     {
         ArgumentNullException.ThrowIfNull(key);
@@ -31,13 +45,16 @@ public class MqttDataSink : IDataSink
         var mqtt_application_message = new MqttApplicationMessage(key, MqttQualityOfServiceLevel.AtLeastOnce)
         {
             PayloadSegment = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(data)),
+
             // Note: add standardized user properties based on cloud event extensions in AIO.
         };
 
-        await _resiliencePipeline.ExecuteAsync(async cancellationToken =>
-        {
-            await _mqttSessionClient.PublishAsync(mqtt_application_message, cancellationToken);
-            _logger.LogTrace("Published data to MQTT broker, topic: '{topic}'.", key);
-        }, stoppingToken);
+        await _resiliencePipeline.ExecuteAsync(
+            async cancellationToken =>
+            {
+                await _mqttSessionClient.PublishAsync(mqtt_application_message, cancellationToken);
+                _logger.LogTrace("Published data to MQTT broker, topic: '{topic}'.", key);
+            },
+            stoppingToken);
     }
 }

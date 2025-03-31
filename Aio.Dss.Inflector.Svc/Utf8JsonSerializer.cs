@@ -1,37 +1,36 @@
 namespace Aio.Dss.Inflector.Svc;
 
+using System;
 using System.Buffers;
 using System.Text.Json;
 using Azure.Iot.Operations.Protocol;
 using Azure.Iot.Operations.Protocol.Models;
 
-public class EmptyJson
-{
-}
-
 public class Utf8JsonSerializer : IPayloadSerializer
 {
-    protected static readonly JsonSerializerOptions jsonSerializerOptions = new()
-    {
-    };
-
     public const string ContentType = "application/json";
-
     public const MqttPayloadFormatIndicator PayloadFormatIndicator = MqttPayloadFormatIndicator.CharacterData;
+
+    private static readonly JsonSerializerOptions DefaultOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public SerializedPayloadContext ToBytes<T>(T? payload)
         where T : class
     {
         try
         {
-            if (typeof(T) == typeof(EmptyJson))
+            // Handle null payload
+            if (payload == null)
             {
-                return new(ReadOnlySequence<byte>.Empty, ContentType, PayloadFormatIndicator);
+                return new(new(JsonSerializer.SerializeToUtf8Bytes(new { })), ContentType, PayloadFormatIndicator);
             }
 
-            return new(new(JsonSerializer.SerializeToUtf8Bytes(payload, jsonSerializerOptions)), ContentType, PayloadFormatIndicator);
+            // Serialize all other objects normally
+            return new(new(JsonSerializer.SerializeToUtf8Bytes(payload, DefaultOptions)), ContentType, PayloadFormatIndicator);
         }
-        catch (Exception)
+        catch
         {
             throw AkriMqttException.GetPayloadInvalidException();
         }
@@ -57,20 +56,46 @@ public class Utf8JsonSerializer : IPayloadSerializer
         {
             if (payload.IsEmpty)
             {
-                if (typeof(T) != typeof(EmptyJson))
-                {
-                    throw AkriMqttException.GetPayloadInvalidException();
-                }
-
-                return (new EmptyJson() as T)!;
+                // For empty payloads, try creating a default instance or deserializing from empty JSON
+                return DeserializeEmptyPayload<T>();
             }
 
             Utf8JsonReader reader = new(payload);
-            return JsonSerializer.Deserialize<T>(ref reader, jsonSerializerOptions)!;
+            T? result = JsonSerializer.Deserialize<T>(ref reader, DefaultOptions);
+
+            if (result == null)
+            {
+                throw AkriMqttException.GetPayloadInvalidException();
+            }
+
+            return result;
         }
-        catch (Exception)
+        catch (Exception ex) when (!(ex is AkriMqttException))
         {
             throw AkriMqttException.GetPayloadInvalidException();
+        }
+    }
+
+    private static T DeserializeEmptyPayload<T>()
+        where T : class
+    {
+        try
+        {
+            // Try to create instance using parameterless constructor
+            return Activator.CreateInstance<T>() ?? throw new InvalidOperationException("Failed to create instance of type");
+        }
+        catch
+        {
+            try
+            {
+                // If that fails, try to deserialize from empty JSON object
+                return JsonSerializer.Deserialize<T>("{}", DefaultOptions)
+                    ?? throw new InvalidOperationException("Failed to deserialize empty JSON");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Cannot create instance of {typeof(T).Name} from empty payload", ex);
+            }
         }
     }
 }
