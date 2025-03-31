@@ -6,13 +6,13 @@ using System.Text.Json.Serialization;
 public class EgressHybridMessage
 {
     [JsonPropertyName("correlationId")]
-    required public string CorrelationId { get; set; }
-    
+    public required string CorrelationId { get; set; }
+
     [JsonPropertyName("actionResponseDataPayload")]
-    required public JsonDocument ActionResponseDataPayload { get; set; }
+    public required JsonDocument ActionResponseDataPayload { get; set; }
 
     [JsonPropertyName("passthroughPayload")]
-    required public JsonDocument? PassthroughPayload { get; set; }
+    public required JsonDocument? PassthroughPayload { get; set; }
 }
 
 // Sample JSON when this class is deserialized

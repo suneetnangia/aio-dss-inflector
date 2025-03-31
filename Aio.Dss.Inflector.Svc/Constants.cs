@@ -2,8 +2,8 @@ namespace Aio.Dss.Inflector.Svc;
 
 public static class Constants
 {
-    public const string DSS_DATA_SOURCE_KEY = "DssDataSource";
-    public const string DSS_DATA_SINK_KEY = "DssDataSink";
-    public const string MQTT_DATA_SINK_KEY = "MqttDataSink";
-    public const string MQTT_EGRESS_TOPIC = "MqttEgressTopic";
+    public const string DssDataSourceKey = "DssDataSource";
+    public const string DssDataSinkKey = "DssDataSink";
+    public const string MqttDataSinkKey = "MqttDataSink";
+    public const string MqttEgressTopic = "MqttEgressTopic";
 }
